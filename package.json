@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-sender",
+  "version": "1.0.0",
+  "description": "Microservicio minimalista de envío unidireccional de WhatsApp",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "@whiskeysockets/baileys": "^6.7.16",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
+    "link-preview-js": "^3.2.0",
+    "pino": "^8.17.2",
+    "qrcode": "^1.5.3"
+  }
+}

@@ -1,0 +1,17 @@
+services:
+  whatsapp-sender:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - wa_sessions:/data
+    environment:
+      API_KEY: ${API_KEY}
+      PORT: 3000
+      SESSION_DIR: /data/sessions
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+volumes:
+  wa_sessions:

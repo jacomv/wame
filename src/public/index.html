@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WA SENDER // CONTROL</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+:root {
+  --green: #00ff41;
+  --green-dim: #00c032;
+  --green-faint: #003d0f;
+  --green-glow: rgba(0,255,65,0.15);
+  --yellow: #ffd700;
+  --red: #ff3131;
+  --bg: #020b02;
+  --panel: #050f05;
+  --border: #0a2a0a;
+  --border-bright: #1a4a1a;
+  --text: #a0ffb0;
+  --text-dim: #4a8a54;
+  --text-faint: #1a3a1e;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-display: 'VT323', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* CRT scanlines */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Vignette */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ── Login screen ── */
+#login-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+}
+
+.login-box {
+  background: var(--panel);
+  border: 1px solid var(--border-bright);
+  padding: 3rem 2.5rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 0 60px rgba(0,255,65,0.07);
+}
+
+.login-logo {
+  font-family: var(--font-display);
+  font-size: 2.8rem;
+  color: var(--green);
+  text-shadow: 0 0 20px var(--green);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.25rem;
+}
+
+.login-logo span { color: var(--text-dim); }
+
+.login-sub {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  letter-spacing: 0.12em;
+  margin-bottom: 2.5rem;
+}
+
+.login-box label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.4rem;
+}
+
+.login-box input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-bright);
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  padding: 0.65rem 0.85rem;
+  outline: none;
+  margin-bottom: 1.5rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.login-box input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 12px var(--green-glow);
+}
+
+.login-error {
+  font-size: 0.7rem;
+  color: var(--red);
+  margin-top: -1rem;
+  margin-bottom: 1rem;
+  letter-spacing: 0.06em;
+  min-height: 1rem;
+}
+
+.btn-login {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.65rem;
+  border: 1px solid var(--green);
+  cursor: pointer;
+  background: transparent;
+  color: var(--green);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+
+.btn-login:hover {
+  background: var(--green);
+  color: var(--bg);
+  box-shadow: 0 0 16px var(--green-glow);
+}
+
+.btn-login:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Header ── */
+header {
+  border-bottom: 1px solid var(--border-bright);
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+
+header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--green), transparent);
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  color: var(--green);
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 20px var(--green), 0 0 40px rgba(0,255,65,0.3);
+  line-height: 1;
+}
+
+.logo span { color: var(--text-dim); }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.sys-time {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: right;
+  line-height: 1.6;
+}
+
+.sys-time strong { color: var(--green); display: block; font-size: 1rem; }
+
+.btn-logout {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--text-faint);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: all 0.15s;
+}
+
+.btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+/* ── Status bar ── */
+#status-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 2rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  display: inline-block;
+  margin-right: 0.3rem;
+}
+
+/* ── Main layout ── */
+main {
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Section headers ── */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-bright);
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--green);
+  letter-spacing: 0.12em;
+}
+
+.section-title::before { content: '> '; color: var(--text-dim); }
+
+/* ── Buttons ── */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid;
+  cursor: pointer;
+  background: transparent;
+  letter-spacing: 0.08em;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.btn-primary { color: var(--green); border-color: var(--green); }
+.btn-primary:hover { background: var(--green); color: var(--bg); box-shadow: 0 0 12px var(--green-glow); }
+
+.btn-danger { color: var(--red); border-color: var(--red); font-size: 0.65rem; }
+.btn-danger:hover { background: var(--red); color: #fff; }
+
+.btn-warn { color: var(--yellow); border-color: var(--yellow); }
+.btn-warn:hover { background: var(--yellow); color: var(--bg); }
+
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Instances grid ── */
+#instances-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+/* ── Instance card — sin animation para evitar titileo ── */
+.instance-card {
+  background: var(--panel);
+  border: 1px solid var(--border-bright);
+  padding: 1.25rem;
+  position: relative;
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
+
+/* Solo animar al crear por primera vez */
+.instance-card.new-card {
+  animation: cardIn 0.3s ease forwards;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.instance-card.connected {
+  border-color: rgba(0,255,65,0.4);
+  box-shadow: 0 0 16px rgba(0,255,65,0.05), inset 0 0 20px rgba(0,255,65,0.03);
+}
+
+.instance-card.qr { border-color: rgba(255,215,0,0.4); }
+.instance-card.logged_out, .instance-card.error { border-color: rgba(255,49,49,0.3); }
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 0.5rem;
+}
+
+.instance-name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--green);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  word-break: break-all;
+}
+
+.instance-phone { font-size: 0.68rem; color: var(--text-dim); margin-top: 0.2rem; }
+
+.badge {
+  font-size: 0.62rem;
+  padding: 0.2rem 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badge.connected { color: var(--green); border-color: var(--green); }
+.badge.connecting, .badge.qr { color: var(--yellow); border-color: var(--yellow); }
+.badge.logged_out, .badge.disconnected { color: var(--red); border-color: var(--red); }
+.badge.unknown { color: var(--text-dim); border-color: var(--text-dim); }
+
+.qr-wrap {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qr-label { font-size: 0.68rem; color: var(--yellow); letter-spacing: 0.1em; }
+
+.qr-wrap img {
+  width: 180px;
+  height: 180px;
+  border: 2px solid var(--yellow);
+  padding: 6px;
+  background: #fff;
+  image-rendering: pixelated;
+}
+
+.card-meta { font-size: 0.65rem; color: var(--text-dim); margin-bottom: 0.75rem; line-height: 1.7; }
+.card-meta span { color: var(--text); }
+
+.card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.empty-state {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  border: 1px dashed var(--border);
+  letter-spacing: 0.08em;
+}
+
+.empty-state .big { font-family: var(--font-display); font-size: 2rem; color: var(--text-dim); display: block; margin-bottom: 0.5rem; }
+
+/* ── Logs ── */
+.logs-table-wrap { overflow-x: auto; border: 1px solid var(--border-bright); }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+
+thead tr { background: var(--green-faint); border-bottom: 1px solid var(--border-bright); }
+
+th {
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  color: var(--green);
+  letter-spacing: 0.1em;
+  font-weight: normal;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+td { padding: 0.5rem 0.85rem; color: var(--text-dim); border-bottom: 1px solid var(--border); white-space: nowrap; }
+tr:hover td { background: rgba(0,255,65,0.03); color: var(--text); }
+
+td.ok { color: var(--green); }
+td.error { color: var(--red); }
+td.type-text { color: #88aaff; }
+td.type-audio { color: #ff88cc; }
+td.type-image { color: #ffaa44; }
+td.type-document { color: #aaffee; }
+
+.no-logs { text-align: center; padding: 2rem; color: var(--text-faint); font-size: 0.75rem; letter-spacing: 0.08em; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--green);
+  box-shadow: 0 0 40px rgba(0,255,65,0.15);
+  padding: 2rem;
+  min-width: 340px;
+}
+
+.modal-title { font-family: var(--font-display); font-size: 1.6rem; color: var(--green); margin-bottom: 1.25rem; letter-spacing: 0.1em; }
+
+.modal label { display: block; font-size: 0.72rem; color: var(--text-dim); margin-bottom: 0.3rem; letter-spacing: 0.08em; }
+
+.modal input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-bright);
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  margin-bottom: 1.25rem;
+  transition: border-color 0.2s;
+}
+
+.modal input:focus { border-color: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+.modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  font-size: 0.75rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid;
+  background: var(--panel);
+  z-index: 9000;
+  letter-spacing: 0.06em;
+  max-width: 320px;
+}
+
+#toast.ok  { color: var(--green); border-color: var(--green); }
+#toast.err { color: var(--red);   border-color: var(--red);   }
+#toast.info { color: var(--yellow); border-color: var(--yellow); }
+#toast.hidden { display: none; }
+
+.hidden { display: none !important; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); }
+::-webkit-scrollbar-thumb:hover { background: var(--green-dim); }
+</style>
+</head>
+<body>
+
+<!-- ── Login screen ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">WA<span>//</span>SENDER</div>
+    <div class="login-sub">UNIDIRECTIONAL MESSAGING SYSTEM</div>
+    <label>API KEY</label>
+    <input type="password" id="login-input" placeholder="••••••••••••" autocomplete="off"
+           onkeydown="if(event.key==='Enter') doLogin()">
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-login" id="login-btn" onclick="doLogin()">ACCEDER →</button>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div id="app" class="hidden">
+
+  <header>
+    <div>
+      <div class="logo">WA<span>//</span>SENDER <span style="font-size:1.1rem;color:var(--text-dim)">CONTROL</span></div>
+      <div style="font-size:0.65rem;color:var(--text-dim);margin-top:0.2rem;letter-spacing:0.1em">UNIDIRECTIONAL MESSAGING SYSTEM v1.0</div>
+    </div>
+    <div class="header-right">
+      <div class="sys-time">
+        <strong id="clock">--:--:--</strong>
+        <span id="date-display">---</span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">CERRAR SESIÓN</button>
+    </div>
+  </header>
+
+  <div id="status-bar">
+    <span><span class="dot"></span>AUTENTICADO</span>
+    <span style="color:var(--text-faint)">|</span>
+    <span>POLLING: <span id="poll-status" style="color:var(--green)">ON</span></span>
+  </div>
+
+  <main>
+    <section>
+      <div class="section-head">
+        <div class="section-title">INSTANCIAS</div>
+        <button class="btn btn-primary" onclick="openNewModal()">+ NUEVA INSTANCIA</button>
+      </div>
+      <div id="instances-grid">
+        <div class="empty-state"><span class="big">[∅]</span>no hay instancias activas</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div class="section-title">LOGS RECIENTES</div>
+        <button class="btn btn-primary" style="font-size:0.65rem" onclick="fetchLogs()">↺ REFRESH</button>
+      </div>
+      <div class="logs-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>INSTANCIA</th>
+              <th>DESTINO</th>
+              <th>TIPO</th>
+              <th>ESTADO</th>
+              <th>TIMESTAMP</th>
+            </tr>
+          </thead>
+          <tbody id="logs-body">
+            <tr><td colspan="5" class="no-logs">sin datos</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+</div>
+
+<!-- Modal nueva instancia -->
+<div class="modal-overlay hidden" id="new-modal" onclick="closeModalOnOverlay(event)">
+  <div class="modal">
+    <div class="modal-title">NUEVA INSTANCIA</div>
+    <label>NOMBRE DE INSTANCIA</label>
+    <input type="text" id="new-name-input" placeholder="ej: ibsg, grupo-principal..."
+           onkeydown="if(event.key==='Enter') createInstance()"
+           autocomplete="off" spellcheck="false">
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="closeNewModal()">CANCELAR</button>
+      <button class="btn btn-primary" onclick="createInstance()">CONECTAR →</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script>
+// ── API key solo en memoria — nunca en DOM ni localStorage ─────
+let _apiKey = null;
+let pollTimer = null;
+let qrStore = {};
+// Set de nombres de cards que ya existen en el DOM (para no reanimar)
+const existingCards = new Set();
+
+// ── Login ──────────────────────────────────────────────────────
+async function doLogin() {
+  const input = document.getElementById('login-input');
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-error');
+  const key   = input.value.trim();
+
+  if (!key) { err.textContent = 'Ingresa la API key'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'VERIFICANDO…';
+  err.textContent = '';
+
+  try {
+    const res = await fetch('/status', { headers: { 'x-api-key': key } });
+    if (!res.ok) throw new Error('key inválida');
+
+    // Key válida — guardar solo en memoria
+    _apiKey = key;
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    input.value = ''; // limpiar el campo
+    startPolling();
+    updateClock();
+    setInterval(updateClock, 1000);
+  } catch (_) {
+    err.textContent = '✗ API key incorrecta';
+    btn.disabled = false;
+    btn.textContent = 'ACCEDER →';
+    input.focus();
+  }
+}
+
+function doLogout() {
+  _apiKey = null;
+  stopPolling();
+  existingCards.clear();
+  qrStore = {};
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-input').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+// ── Clock ──────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('es-CO', { hour12: false });
+  document.getElementById('date-display').textContent = now.toLocaleDateString('es-CO', { weekday:'short', year:'numeric', month:'short', day:'numeric' }).toUpperCase();
+}
+
+// ── API helper ─────────────────────────────────────────────────
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: { 'x-api-key': _apiKey, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (res.status === 401) { doLogout(); throw new Error('sesión expirada'); }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ── Polling ────────────────────────────────────────────────────
+function startPolling() {
+  stopPolling();
+  poll();
+  pollTimer = setInterval(poll, 3000);
+}
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+async function poll() {
+  try {
+    const data = await api('GET', '/status');
+    updateInstances(data.instances || []);
+    fetchLogs();
+  } catch (_) {}
+}
+
+// ── Update instancias SIN reescribir el DOM completo ───────────
+function updateInstances(instances) {
+  const grid = document.getElementById('instances-grid');
+
+  if (!instances.length) {
+    grid.innerHTML = `<div class="empty-state"><span class="big">[∅]</span>no hay instancias activas — crea una nueva</div>`;
+    existingCards.clear();
+    qrStore = {};
+    return;
+  }
+
+  // Limpiar QR de instancias que ya conectaron
+  instances.forEach(inst => {
+    if (inst.status === 'connected') delete qrStore[inst.name];
+  });
+
+  const currentNames = new Set(instances.map(i => i.name));
+
+  // Eliminar cards que ya no existen
+  existingCards.forEach(name => {
+    if (!currentNames.has(name)) {
+      document.getElementById(`card-${name}`)?.remove();
+      existingCards.delete(name);
+    }
+  });
+
+  // Eliminar empty-state si existe
+  grid.querySelector('.empty-state')?.remove();
+
+  instances.forEach(inst => {
+    const existing = document.getElementById(`card-${inst.name}`);
+    if (existing) {
+      // Actualizar in-place sin recrear el nodo (sin titileo)
+      updateCard(existing, inst);
+    } else {
+      // Nueva card — sí animar
+      const div = document.createElement('div');
+      div.innerHTML = buildCardHTML(inst, true);
+      grid.appendChild(div.firstElementChild);
+      existingCards.add(inst.name);
+    }
+  });
+}
+
+function updateCard(el, inst) {
+  // Actualizar clase de estado
+  el.className = `instance-card ${inst.status}`;
+
+  // Badge
+  const badge = el.querySelector('.badge');
+  if (badge) {
+    badge.className = `badge ${inst.status}`;
+    badge.textContent = statusLabel(inst.status);
+  }
+
+  // Teléfono
+  const phone = el.querySelector('.instance-phone');
+  if (phone) phone.textContent = inst.phone ? '📱 ' + inst.phone : 'sin número';
+
+  // Meta
+  const meta = el.querySelector('.card-meta');
+  if (meta) meta.innerHTML = buildMeta(inst);
+
+  // QR — solo actualizar si cambió
+  const existingQr = el.querySelector('.qr-wrap');
+  if (inst.status === 'qr' && qrStore[inst.name]) {
+    if (!existingQr) {
+      const div = document.createElement('div');
+      div.innerHTML = buildQrHTML(inst.name);
+      el.querySelector('.card-meta')?.insertAdjacentElement('beforebegin', div.firstElementChild);
+    }
+  } else if (existingQr) {
+    existingQr.remove();
+  }
+
+  // Botones
+  const actions = el.querySelector('.card-actions');
+  if (actions) actions.innerHTML = buildActions(inst);
+}
+
+function buildCardHTML(inst, isNew) {
+  return `
+  <div class="instance-card ${inst.status}${isNew ? ' new-card' : ''}" id="card-${inst.name}">
+    <div class="card-header">
+      <div>
+        <div class="instance-name">${escHtml(inst.name)}</div>
+        <div class="instance-phone">${inst.phone ? '📱 ' + inst.phone : 'sin número'}</div>
+      </div>
+      <span class="badge ${inst.status}">${statusLabel(inst.status)}</span>
+    </div>
+    ${inst.status === 'qr' && qrStore[inst.name] ? buildQrHTML(inst.name) : ''}
+    <div class="card-meta">${buildMeta(inst)}</div>
+    <div class="card-actions">${buildActions(inst)}</div>
+  </div>`;
+}
+
+function statusLabel(s) {
+  return { connected:'CONECTADO', connecting:'CONECTANDO…', qr:'ESCANEA QR', logged_out:'SESIÓN CERRADA', disconnected:'DESCONECTADO' }[s] || s.toUpperCase();
+}
+
+function buildMeta(inst) {
+  const since = inst.connectedAt ? new Date(inst.connectedAt).toLocaleString('es-CO', { hour12: false }) : '—';
+  return `CONECTADO DESDE <span>${since}</span><br>ESTADO &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span>${inst.status}</span>`;
+}
+
+function buildQrHTML(name) {
+  return `<div class="qr-wrap">
+    <div class="qr-label">▶ ESCANEA CON WHATSAPP ◀</div>
+    <img src="${qrStore[name]}" alt="QR ${escHtml(name)}">
+    <div style="font-size:0.62rem;color:var(--text-faint)">el QR expira en ~20s</div>
+  </div>`;
+}
+
+function buildActions(inst) {
+  if (inst.status === 'connected') {
+    return `<button class="btn btn-danger" onclick="disconnectInstance('${inst.name}')">DESCONECTAR</button>`;
+  }
+  return `<button class="btn btn-warn" onclick="reconnectInstance('${inst.name}')">RECONECTAR</button>
+          <button class="btn btn-danger" onclick="disconnectInstance('${inst.name}')">ELIMINAR</button>`;
+}
+
+// ── Acciones ───────────────────────────────────────────────────
+async function reconnectInstance(name) {
+  toast('info', `Reconectando ${name}…`);
+  try {
+    const data = await api('POST', `/instances/${name}/connect`);
+    if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', `QR listo — escanea con WhatsApp`); }
+    else toast('ok', `${name} conectado`);
+    poll();
+  } catch (e) { toast('err', `Error: ${e.message}`); }
+}
+
+async function disconnectInstance(name) {
+  if (!confirm(`¿Desconectar y eliminar instancia "${name}"?`)) return;
+  try {
+    await api('DELETE', `/instances/${name}`);
+    delete qrStore[name];
+    existingCards.delete(name);
+    document.getElementById(`card-${name}`)?.remove();
+    toast('ok', `Instancia ${name} eliminada`);
+    if (!existingCards.size) {
+      document.getElementById('instances-grid').innerHTML = `<div class="empty-state"><span class="big">[∅]</span>no hay instancias activas — crea una nueva</div>`;
+    }
+  } catch (e) { toast('err', `Error: ${e.message}`); }
+}
+
+// ── Modal ──────────────────────────────────────────────────────
+function openNewModal() {
+  document.getElementById('new-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('new-name-input').focus(), 50);
+}
+
+function closeNewModal() {
+  document.getElementById('new-modal').classList.add('hidden');
+  document.getElementById('new-name-input').value = '';
+}
+
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('new-modal')) closeNewModal();
+}
+
+async function createInstance() {
+  const name = document.getElementById('new-name-input').value.trim();
+  if (!name) { toast('err', 'Ingresa un nombre'); return; }
+  if (!/^[a-z0-9_-]+$/i.test(name)) { toast('err', 'Solo letras, números, guiones'); return; }
+  closeNewModal();
+  toast('info', `Iniciando "${name}"…`);
+  try {
+    const data = await api('POST', `/instances/${name}/connect`);
+    if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', `QR listo — escanea con WhatsApp`); }
+    else if (data.status === 'connected') toast('ok', `"${name}" ya conectado`);
+    poll();
+  } catch (e) { toast('err', `Error: ${e.message}`); }
+}
+
+// ── Logs ───────────────────────────────────────────────────────
+async function fetchLogs() {
+  try {
+    const data = await api('GET', '/logs?limit=15');
+    const tbody = document.getElementById('logs-body');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-logs">sin registros aún</td></tr>'; return; }
+    tbody.innerHTML = data.map(log => {
+      const ts = new Date(log.created_at).toLocaleString('es-CO', { hour12: false });
+      const dest = log.to.length > 28 ? log.to.slice(0, 26) + '…' : log.to;
+      const errTip = log.error ? ` title="${escHtml(log.error)}"` : '';
+      return `<tr>
+        <td>${escHtml(log.instance)}</td>
+        <td style="font-size:0.65rem">${escHtml(dest)}</td>
+        <td class="type-${log.type}">${log.type.toUpperCase()}</td>
+        <td class="${log.status === 'ok' ? 'ok' : 'error'}"${errTip}>${log.status === 'ok' ? '✓ OK' : '✗ ERROR'}</td>
+        <td style="color:var(--text-faint)">${ts}</td>
+      </tr>`;
+    }).join('');
+  } catch (_) {}
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+let toastTimer;
+function toast(type, msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = 'hidden', 4000);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
