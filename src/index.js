@@ -91,20 +91,22 @@ app.get('/instances/:name/status', requireApiKey, validateInstanceName, (req, re
 
 // ── Normalizar JID ──────────────────────────────────────────────
 function normalizeJid(to) {
-  // Limpiar caracteres comunes que el usuario podría incluir
+  // Si ya es un JID completo (tiene @), solo limpiar espacios
+  if (to.includes('@')) return to.trim();
+  // Solo número: limpiar formato telefónico común
   const cleaned = to.replace(/[\s+()-]/g, '');
-  if (cleaned.includes('@')) return cleaned;
   return `${cleaned}@s.whatsapp.net`;
 }
 
 // ── Validar número de teléfono ──────────────────────────────────
 function validatePhoneOrJid(to) {
-  const cleaned = to.replace(/[\s+()-]/g, '');
+  const trimmed = to.trim();
   // Si tiene @, es un JID completo — aceptar formato grupo o individual
-  if (cleaned.includes('@')) {
-    return /^[\w.-]+@(s\.whatsapp\.net|g\.us)$/.test(cleaned);
+  if (trimmed.includes('@')) {
+    return /^[\w.-]+@(s\.whatsapp\.net|g\.us)$/.test(trimmed);
   }
-  // Solo número: entre 7 y 15 dígitos (estándar E.164 sin +)
+  // Solo número: limpiar formato y validar entre 7 y 15 dígitos (E.164 sin +)
+  const cleaned = trimmed.replace(/[\s+()-]/g, '');
   return /^\d{7,15}$/.test(cleaned);
 }
 
