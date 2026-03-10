@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAME - Test API</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 32px; width: 420px; max-width: 95vw; }
+    h1 { font-size: 20px; margin-bottom: 4px; color: #fff; }
+    .sub { color: #888; font-size: 13px; margin-bottom: 24px; }
+    label { display: block; font-size: 13px; color: #aaa; margin-bottom: 4px; margin-top: 16px; }
+    input, textarea, select { width: 100%; padding: 10px 12px; border: 1px solid #333; border-radius: 8px; background: #111; color: #fff; font-size: 14px; outline: none; }
+    input:focus, textarea:focus, select:focus { border-color: #25D366; }
+    textarea { resize: vertical; min-height: 60px; }
+    button { margin-top: 24px; width: 100%; padding: 12px; border: none; border-radius: 8px; background: #25D366; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #1fb855; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 13px; font-family: monospace; white-space: pre-wrap; word-break: break-all; display: none; }
+    .result.ok { display: block; background: #0d2818; border: 1px solid #25D366; color: #4ade80; }
+    .result.err { display: block; background: #2a0a0a; border: 1px solid #e53e3e; color: #fc8181; }
+    .result.loading { display: block; background: #1a1a2e; border: 1px solid #4a5568; color: #a0aec0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>WAME Test API</h1>
+    <p class="sub">Prueba rapida de envio de mensajes</p>
+
+    <label>Instancia</label>
+    <input id="instance" value="devocional" placeholder="nombre de instancia">
+
+    <label>API Key</label>
+    <input id="apikey" type="password" value="Keilaraquel84" placeholder="tu API key">
+
+    <label>Numero destino</label>
+    <input id="to" value="573004129866" placeholder="573001234567">
+
+    <label>Tipo</label>
+    <select id="type" onchange="toggleFields()">
+      <option value="text">Texto</option>
+      <option value="image">Imagen</option>
+      <option value="audio">Audio</option>
+      <option value="document">Documento</option>
+    </select>
+
+    <div id="text-fields">
+      <label>Mensaje</label>
+      <textarea id="text" placeholder="Hola desde WAME!">Prueba desde WAME API</textarea>
+    </div>
+
+    <div id="media-fields" style="display:none">
+      <label>URL del archivo</label>
+      <input id="url" placeholder="https://ejemplo.com/foto.jpg">
+      <label>Caption / Filename (opcional)</label>
+      <input id="extra" placeholder="opcional">
+    </div>
+
+    <button id="btn" onclick="send()">Enviar mensaje de prueba</button>
+
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    function toggleFields() {
+      const type = document.getElementById('type').value;
+      document.getElementById('text-fields').style.display = type === 'text' ? 'block' : 'none';
+      document.getElementById('media-fields').style.display = type !== 'text' ? 'block' : 'none';
+    }
+
+    async function send() {
+      const btn = document.getElementById('btn');
+      const result = document.getElementById('result');
+      const instance = document.getElementById('instance').value.trim();
+      const apikey = document.getElementById('apikey').value.trim();
+      const to = document.getElementById('to').value.trim();
+      const type = document.getElementById('type').value;
+
+      if (!instance || !apikey || !to) {
+        result.className = 'result err';
+        result.textContent = 'Completa todos los campos';
+        return;
+      }
+
+      const body = { to, type };
+      if (type === 'text') {
+        body.text = document.getElementById('text').value;
+      } else {
+        body.url = document.getElementById('url').value;
+        const extra = document.getElementById('extra').value;
+        if (extra) {
+          if (type === 'image') body.caption = extra;
+          else if (type === 'document') body.filename = extra;
+        }
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      result.className = 'result loading';
+      result.textContent = 'Conectando con la API...';
+
+      try {
+        const baseUrl = window.location.origin;
+        const url = `${baseUrl}/instances/${instance}/send`;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apikey,
+          },
+          body: JSON.stringify(body),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          result.className = 'result ok';
+          result.textContent = 'EXITO! Mensaje enviado.\n\n' + JSON.stringify(data, null, 2);
+        } else {
+          result.className = 'result err';
+          result.textContent = `Error ${res.status}:\n${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (err) {
+        result.className = 'result err';
+        result.textContent = 'Error de conexion:\n' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar mensaje de prueba';
+      }
+    }
+  </script>
+</body>
+</html>
