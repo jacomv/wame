@@ -5,18 +5,21 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
-import { mkdirSync } from 'fs';
+import { mkdir } from 'fs/promises';
 import path from 'path';
 import pino from 'pino';
 import QRCode from 'qrcode';
 
 const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
-const logger = pino({ level: 'silent' }); // silencia logs internos de Baileys
+const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
+const logger = pino({ level: 'silent' });
 
 // Map de instancias activas: name → { sock, status, qr, phone, connectedAt }
 const instances = new Map();
 // Set para evitar reconexiones simultáneas
 const reconnecting = new Set();
+// Map de timers de reconexión pendientes para poder cancelarlos
+const reconnectTimers = new Map();
 
 export async function connectInstance(name) {
   // Si ya está conectada, no hacer nada
@@ -30,8 +33,7 @@ export async function connectInstance(name) {
   reconnecting.add(name);
 
   const sessionPath = path.join(SESSION_DIR, name);
-  // Garantizar que el directorio existe antes de que Baileys escriba en él
-  mkdirSync(sessionPath, { recursive: true });
+  await mkdir(sessionPath, { recursive: true });
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -55,6 +57,7 @@ export async function connectInstance(name) {
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
     const inst = instances.get(name);
+    if (!inst) return; // Instancia fue eliminada mientras procesaba
 
     if (qr) {
       const qrImage = await QRCode.toDataURL(qr);
@@ -78,7 +81,12 @@ export async function connectInstance(name) {
 
       if (shouldReconnect) {
         instances.delete(name);
-        setTimeout(() => connectInstance(name), 5000);
+        // Guardar referencia al timer para poder cancelarlo
+        const timer = setTimeout(() => {
+          reconnectTimers.delete(name);
+          connectInstance(name);
+        }, 5000);
+        reconnectTimers.set(name, timer);
       } else {
         instances.set(name, { sock: null, status: 'logged_out', qr: null, phone: null, connectedAt: null });
       }
@@ -86,14 +94,21 @@ export async function connectInstance(name) {
   });
 
   return new Promise((resolve) => {
+    let elapsed = 0;
     const check = setInterval(() => {
+      elapsed += 300;
       const inst = instances.get(name);
+
       if (inst?.status === 'connected') {
         clearInterval(check);
         resolve({ status: 'connected' });
       } else if (inst?.status === 'qr') {
         clearInterval(check);
         resolve({ status: 'qr', qr: inst.qr });
+      } else if (elapsed >= QR_TIMEOUT_MS) {
+        clearInterval(check);
+        reconnecting.delete(name);
+        resolve({ status: 'timeout', error: 'Tiempo de espera agotado para QR/conexión' });
       }
     }, 300);
   });
@@ -128,6 +143,13 @@ export async function disconnectInstance(name) {
   const inst = instances.get(name);
   if (!inst) return false;
 
+  // Cancelar reconexión pendiente si existe
+  const timer = reconnectTimers.get(name);
+  if (timer) {
+    clearTimeout(timer);
+    reconnectTimers.delete(name);
+  }
+
   reconnecting.add(name); // bloquear reconexión automática durante el proceso
   try {
     if (inst.sock) await inst.sock.logout();
@@ -148,14 +170,38 @@ export async function disconnectInstance(name) {
 
 // Al arrancar, reconectar instancias que tengan sesión guardada
 export async function restoreExistingSessions() {
-  const { readdirSync, existsSync } = await import('fs');
-  if (!existsSync(SESSION_DIR)) return;
-  const dirs = readdirSync(SESSION_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name);
+  const { readdir } = await import('fs/promises');
+  try {
+    const entries = await readdir(SESSION_DIR, { withFileTypes: true });
+    const dirs = entries.filter((d) => d.isDirectory()).map((d) => d.name);
 
-  for (const name of dirs) {
-    console.log(`[manager] Restaurando sesión: ${name}`);
-    connectInstance(name).catch((e) => console.error(`[manager] Error restaurando ${name}:`, e));
+    for (const name of dirs) {
+      console.log(`[manager] Restaurando sesión: ${name}`);
+      connectInstance(name).catch((e) => console.error(`[manager] Error restaurando ${name}:`, e));
+    }
+  } catch (err) {
+    if (err.code === 'ENOENT') return; // Directorio no existe, nada que restaurar
+    throw err;
   }
+}
+
+/** Apagado limpio: desconectar todos los sockets */
+export async function shutdown() {
+  // Cancelar todos los timers de reconexión
+  for (const [name, timer] of reconnectTimers) {
+    clearTimeout(timer);
+    reconnectTimers.delete(name);
+    console.log(`[manager] Reconexión de ${name} cancelada`);
+  }
+
+  for (const [name, inst] of instances) {
+    try {
+      if (inst.sock) {
+        inst.sock.end();
+        console.log(`[manager] ${name} desconectado`);
+      }
+    } catch (_) {}
+  }
+  instances.clear();
+  reconnecting.clear();
 }

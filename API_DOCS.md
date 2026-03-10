@@ -543,13 +543,61 @@ curl -X POST http://localhost:3000/instances/ventas/send \
 
 ---
 
+## Health check
+
+Endpoint sin autenticación, útil para load balancers, Docker health checks y monitoreo:
+
+```bash
+curl http://localhost:3000/health
+```
+
+Respuesta:
+```json
+{
+  "ok": true,
+  "uptime": 3600.123
+}
+```
+
+---
+
+## Seguridad
+
+WAME incluye varias capas de protección:
+
+| Mecanismo | Descripción |
+|-----------|-------------|
+| **Helmet** | Headers HTTP de seguridad (X-Frame-Options, CSP, etc.) |
+| **Rate limiting** | 100 req/min global, 30 envíos/min por IP (configurable) |
+| **CORS** | Control de origen cruzado (configurable via `CORS_ORIGIN`) |
+| **Body limit** | Máximo 5 MB por request |
+| **Timing-safe auth** | Comparación en tiempo constante del API key (previene timing attacks) |
+| **Path traversal** | Nombres de instancia validados: solo `[a-zA-Z0-9_-]` |
+| **URL validation** | Solo URLs HTTP/HTTPS en media (previene SSRF con `file://`, etc.) |
+| **Input validation** | Formato de teléfono E.164, tipos de mensaje válidos |
+
+---
+
+## Monitor de actualizaciones
+
+Al iniciar, WAME verifica automáticamente si hay nuevas versiones de las dependencias críticas (Baileys, Express, Supabase) consultando el registro de npm. Los avisos aparecen en la consola:
+
+```
+[updater] Verificando actualizaciones de dependencias...
+[updater] ⚠ @whiskeysockets/baileys: instalada 6.7.16 → disponible 6.8.0
+[updater] Ejecuta "npm update" o revisa los changelogs antes de actualizar.
+```
+
+---
+
 ## Códigos de error
 
 | HTTP Status | Significado | Acción recomendada |
 |-------------|-------------|-------------------|
-| `400` | Campos obligatorios faltantes | Verificar que `to` y `type` estén presentes |
+| `400` | Campos obligatorios faltantes o formato inválido | Verificar `to`, `type` y formato del número |
 | `401` | API key inválida o no enviada | Verificar el header `x-api-key` |
 | `404` | Instancia no encontrada | Verificar el nombre de la instancia |
+| `429` | Rate limit alcanzado | Esperar y reintentar con backoff |
 | `500` | Error interno del servidor | Revisar logs del servidor |
 | `503` | Instancia no conectada | Reconectar la instancia con `/connect` |
 
