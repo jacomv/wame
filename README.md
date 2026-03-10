@@ -12,6 +12,9 @@ Microservicio minimalista para enviar mensajes de WhatsApp de forma programátic
 - **Registro de mensajes**: logging automático en Supabase
 - **Dashboard web**: panel de control con interfaz visual para gestión de instancias
 - **Docker ready**: despliegue con un solo comando
+- **Seguridad**: Helmet, rate limiting, CORS, validación de inputs, comparación timing-safe de API keys
+- **Monitor de actualizaciones**: verifica nuevas versiones de Baileys y dependencias críticas al iniciar
+- **Apagado limpio**: cierra conexiones de WhatsApp correctamente con SIGTERM/SIGINT
 
 ## Requisitos previos
 
@@ -85,6 +88,9 @@ npm run dev
 | `SESSION_DIR` | Directorio para almacenar sesiones de WhatsApp | `/data/sessions` |
 | `SUPABASE_URL` | URL de tu proyecto Supabase | — (obligatorio) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key de Supabase | — (obligatorio) |
+| `RATE_LIMIT` | Máximo de peticiones por minuto (global) | `100` |
+| `SEND_RATE_LIMIT` | Máximo de envíos por minuto por IP | `30` |
+| `CORS_ORIGIN` | Origen permitido para CORS | `*` |
 
 ## Esquema de base de datos (Supabase)
 
@@ -134,6 +140,7 @@ Accede a `http://localhost:3000` en tu navegador para usar el panel de administr
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
+| `GET` | `/health` | Health check (sin auth, para load balancers) |
 | `GET` | `/status` | Estado de todas las instancias |
 | `POST` | `/instances/:name/connect` | Conectar/reconectar instancia |
 | `GET` | `/instances/:name/status` | Estado y QR de una instancia |
