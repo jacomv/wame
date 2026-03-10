@@ -600,7 +600,29 @@ async function doLogin() {
 
   try {
     const res = await fetch('/status', { headers: { 'x-api-key': key } });
-    if (!res.ok) throw new Error('key inválida');
+
+    if (res.status === 401) {
+      err.textContent = '✗ API key incorrecta';
+      btn.disabled = false;
+      btn.textContent = 'ACCEDER →';
+      input.focus();
+      return;
+    }
+
+    if (res.status === 429) {
+      err.textContent = '✗ Demasiados intentos. Espera un momento.';
+      btn.disabled = false;
+      btn.textContent = 'ACCEDER →';
+      return;
+    }
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      err.textContent = '✗ Error del servidor: ' + (body.error || 'HTTP ' + res.status);
+      btn.disabled = false;
+      btn.textContent = 'ACCEDER →';
+      return;
+    }
 
     // Key válida — guardar solo en memoria
     _apiKey = key;
@@ -610,8 +632,8 @@ async function doLogin() {
     startPolling();
     updateClock();
     setInterval(updateClock, 1000);
-  } catch (_) {
-    err.textContent = '✗ API key incorrecta';
+  } catch (e) {
+    err.textContent = '✗ No se pudo conectar al servidor: ' + e.message;
     btn.disabled = false;
     btn.textContent = 'ACCEDER →';
     input.focus();
