@@ -158,7 +158,7 @@ x-api-key: tu-api-key
 
 | Campo | Tipo | Obligatorio | Descripción |
 |-------|------|-------------|-------------|
-| `to` | string | Sí | Número de teléfono (con código de país, sin `+`) o ID de grupo |
+| `to` | string | Sí | JID del destinatario: `número@s.whatsapp.net` para contactos o `id@g.us` para grupos |
 | `type` | string | Sí | Tipo de mensaje: `text`, `image`, `audio`, `document` |
 | `text` | string | Solo para `text` | Contenido del mensaje de texto |
 | `url` | string | Solo para media | URL del archivo (imagen, audio, documento) |
@@ -167,11 +167,12 @@ x-api-key: tu-api-key
 | `mimetype` | string | No | Tipo MIME del archivo (solo para `document`, default: `application/octet-stream`) |
 | `ptt` | boolean | No | Enviar como nota de voz (solo para `audio`, default: `false`) |
 
-**Formato del número de teléfono:**
+**Formato del campo `to` (JID de WhatsApp):**
 
-- Usa el formato internacional sin `+` ni espacios
-- Ejemplo: `5491155551234` (Argentina), `521555123456` (México), `34612345678` (España)
-- Para grupos: usa el ID del grupo tal como lo devuelve el endpoint `/groups`
+- **Contactos individuales:** `número@s.whatsapp.net` — usa el número con código de país, sin `+` ni espacios
+  - Ejemplo: `5491155551234@s.whatsapp.net` (Argentina), `521555123456@s.whatsapp.net` (México)
+- **Grupos:** `id@g.us` — usa el ID del grupo tal como lo devuelve el endpoint `/groups`
+  - Ejemplo: `120363012345678901@g.us`
 
 #### Enviar texto
 
@@ -180,7 +181,7 @@ curl -X POST http://localhost:3000/instances/ventas/send \
   -H "x-api-key: tu-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "to": "5491155551234",
+    "to": "5491155551234@s.whatsapp.net",
     "type": "text",
     "text": "Hola, tu pedido #1234 ha sido enviado."
   }'
@@ -193,7 +194,7 @@ curl -X POST http://localhost:3000/instances/ventas/send \
   -H "x-api-key: tu-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "to": "5491155551234",
+    "to": "5491155551234@s.whatsapp.net",
     "type": "image",
     "url": "https://ejemplo.com/factura.png",
     "caption": "Tu factura del mes de enero"
@@ -207,7 +208,7 @@ curl -X POST http://localhost:3000/instances/ventas/send \
   -H "x-api-key: tu-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "to": "5491155551234",
+    "to": "5491155551234@s.whatsapp.net",
     "type": "audio",
     "url": "https://ejemplo.com/mensaje.mp3",
     "ptt": true
@@ -221,7 +222,7 @@ curl -X POST http://localhost:3000/instances/ventas/send \
   -H "x-api-key: tu-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "to": "5491155551234",
+    "to": "5491155551234@s.whatsapp.net",
     "type": "document",
     "url": "https://ejemplo.com/reporte.pdf",
     "filename": "reporte-enero-2025.pdf",
@@ -325,7 +326,7 @@ Devuelve el historial de mensajes enviados.
   {
     "id": 42,
     "instance": "ventas",
-    "to": "5491155551234",
+    "to": "5491155551234@s.whatsapp.net",
     "type": "text",
     "status": "ok",
     "error": null,
