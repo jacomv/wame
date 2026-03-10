@@ -38,6 +38,12 @@ app.get('/instances/:name/status', requireApiKey, (req, res) => {
   res.json(inst);
 });
 
+// ── Normalizar JID ──────────────────────────────────────────────
+function normalizeJid(to) {
+  if (to.includes('@')) return to;
+  return `${to}@s.whatsapp.net`;
+}
+
 // ── Enviar mensaje ──────────────────────────────────────────────
 app.post('/instances/:name/send', requireApiKey, async (req, res) => {
   const { name } = req.params;
@@ -47,17 +53,18 @@ app.post('/instances/:name/send', requireApiKey, async (req, res) => {
     return res.status(400).json({ error: 'Faltan campos: to, type' });
   }
 
+  const jid = normalizeJid(to);
   const sock = getSocket(name);
   if (!sock) {
     return res.status(503).json({ error: `Instancia "${name}" no conectada` });
   }
 
   try {
-    await sendMessage(sock, to, type, payload);
-    await logMessage({ instance: name, to, type, status: 'ok' });
+    await sendMessage(sock, jid, type, payload);
+    await logMessage({ instance: name, to: jid, type, status: 'ok' });
     res.json({ ok: true });
   } catch (err) {
-    await logMessage({ instance: name, to, type, status: 'error', error: err.message });
+    await logMessage({ instance: name, to: jid, type, status: 'error', error: err.message });
     res.status(500).json({ error: err.message });
   }
 });

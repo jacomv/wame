@@ -120,7 +120,7 @@ curl -X POST http://localhost:3000/instances/mi-whatsapp/send \
   -H "x-api-key: tu-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "to": "5491155551234@s.whatsapp.net",
+    "to": "5491155551234",
     "type": "text",
     "text": "Hola desde WAME!"
   }'
