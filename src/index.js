@@ -14,6 +14,7 @@ import { checkUpdates } from './updater.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ── Seguridad ───────────────────────────────────────────────────
 app.use(helmet());
