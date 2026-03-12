@@ -281,7 +281,50 @@ curl http://localhost:3000/instances/ventas/groups \
 
 ---
 
-### 6. Desconectar instancia
+### 6. Participantes de un grupo
+
+```
+GET /instances/:name/groups/:groupId/participants
+```
+
+Devuelve la lista completa de participantes de un grupo con su JID, número de teléfono y rol.
+
+**Parámetros de URL:**
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `name` | string | Nombre de la instancia |
+| `groupId` | string | ID del grupo (ej: `120363012345678901@g.us`) |
+
+**Respuesta:**
+
+```json
+[
+  {
+    "id": "573044487044@s.whatsapp.net",
+    "phone": "573044487044",
+    "admin": null
+  },
+  {
+    "id": "573001234567@s.whatsapp.net",
+    "phone": "573001234567",
+    "admin": "admin"
+  }
+]
+```
+
+**Valores posibles de `admin`:** `null` (miembro normal), `"admin"`, `"superadmin"`
+
+**Ejemplo:**
+
+```bash
+curl http://localhost:3000/instances/ibsg/groups/120363012345678901@g.us/participants \
+  -H "x-api-key: tu-api-key"
+```
+
+---
+
+### 7. Desconectar instancia
 
 ```
 DELETE /instances/:name
@@ -305,7 +348,7 @@ Cierra la sesión de WhatsApp y elimina los datos de la instancia.
 
 ---
 
-### 7. Registros de mensajes
+### 8. Registros de mensajes
 
 ```
 GET /logs

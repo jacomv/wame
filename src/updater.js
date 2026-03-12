@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const WATCHED_DEPS = [
   '@whiskeysockets/baileys',
   'express',
-  '@supabase/supabase-js',
+  'better-sqlite3',
 ];
 
 /**
