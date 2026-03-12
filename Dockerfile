@@ -9,7 +9,7 @@ RUN npm ci --production
 
 COPY src/ ./src/
 
-# Las sesiones persisten en este volumen
+# Sesiones, webhooks y base de datos persisten en este volumen
 VOLUME ["/data"]
 
 EXPOSE 3000
