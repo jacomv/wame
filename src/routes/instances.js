@@ -5,6 +5,7 @@ import { validateInstanceName, normalizeJid, validatePhoneOrJid } from '../utils
 import { connectInstance, getSocket, getInstanceStatus, disconnectInstance } from '../manager.js';
 import { sendMessage } from '../sender.js';
 import { logMessage } from '../logger.js';
+import { dispatch, listWebhooks } from '../webhooks.js';
 
 const router = Router();
 
@@ -78,6 +79,37 @@ router.get('/:name/groups', requireApiKey, validateInstanceName, async (req, res
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Test webhook: dispara payload de prueba y reporta resultado ─
+router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, async (req, res) => {
+  const { name } = req.params;
+  const hooks = await listWebhooks(name);
+  if (!hooks.length) return res.status(404).json({ error: 'No hay webhooks registrados para esta instancia' });
+
+  const results = await Promise.all(
+    hooks.map(async (hook) => {
+      const payload = JSON.stringify({
+        event: 'messages',
+        instance: name,
+        timestamp: new Date().toISOString(),
+        data: { from: 'test@s.whatsapp.net', pushName: 'Test', type: 'text', text: 'Mensaje de prueba', messageId: 'test-001', isGroup: false },
+      });
+      try {
+        const r = await fetch(hook.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          signal: AbortSignal.timeout(7000),
+        });
+        const body = await r.text();
+        return { url: hook.url, events: hook.events, httpStatus: r.status, ok: r.ok, response: body.slice(0, 200) };
+      } catch (err) {
+        return { url: hook.url, events: hook.events, error: err.message };
+      }
+    })
+  );
+  res.json({ results });
 });
 
 // ── Desconectar / eliminar instancia ───────────────────────────
