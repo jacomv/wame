@@ -1,372 +1,408 @@
-// ── API key solo en memoria — nunca en DOM ni localStorage ─────
-let _apiKey = null;
-let pollTimer = null;
-let qrStore = {};
-let webhookStore = {}; // name → [ { id, url, events } ]
-const existingCards = new Set();
+// ── State ───────────────────────────────────────────────────────
+let _apiKey       = null;
+let pollTimer     = null;
+let qrStore       = {};
+let webhookStore  = {};
+let instancesData = [];
+let activeView    = 'instances';
+let detailName    = null;
 
-// ── Login ──────────────────────────────────────────────────────
+// ── API helper ──────────────────────────────────────────────────
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: {
+      'x-api-key': _apiKey,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401) { doLogout(); throw new Error(t('toast.session.expired')); }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Auth ────────────────────────────────────────────────────────
 async function doLogin() {
   const input = document.getElementById('login-input');
   const btn   = document.getElementById('login-btn');
   const err   = document.getElementById('login-error');
   const key   = input.value.trim();
 
-  if (!key) { err.textContent = 'Ingresa la API key'; return; }
+  if (!key) { err.textContent = t('login.error.invalid'); return; }
 
   btn.disabled = true;
-  btn.textContent = 'VERIFICANDO…';
   err.textContent = '';
 
   try {
     const res = await fetch('/status', { headers: { 'x-api-key': key } });
-
     if (res.status === 401) {
-      err.textContent = '✗ API key incorrecta';
-      btn.disabled = false;
-      btn.textContent = 'ACCEDER →';
-      input.focus();
-      return;
+      err.textContent = t('login.error.invalid');
+      btn.disabled = false; input.focus(); return;
     }
-
     if (res.status === 429) {
-      err.textContent = '✗ Demasiados intentos. Espera un momento.';
-      btn.disabled = false;
-      btn.textContent = 'ACCEDER →';
-      return;
+      err.textContent = t('login.error.rate_limit');
+      btn.disabled = false; return;
     }
-
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      err.textContent = '✗ Error del servidor: ' + (body.error || 'HTTP ' + res.status);
-      btn.disabled = false;
-      btn.textContent = 'ACCEDER →';
-      return;
+      err.textContent = t('login.error.server');
+      btn.disabled = false; return;
     }
-
     _apiKey = key;
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     input.value = '';
+    // Apply current language to app UI
+    applyTranslations();
     startPolling();
-    updateClock();
-    setInterval(updateClock, 1000);
   } catch (e) {
-    err.textContent = '✗ No se pudo conectar al servidor: ' + e.message;
-    btn.disabled = false;
-    btn.textContent = 'ACCEDER →';
-    input.focus();
+    err.textContent = t('login.error.connect') + e.message;
+    btn.disabled = false; input.focus();
   }
 }
 
 function doLogout() {
   _apiKey = null;
   stopPolling();
-  existingCards.clear();
-  qrStore = {};
-  webhookStore = {};
+  instancesData = []; qrStore = {}; webhookStore = {};
+  detailName = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-input').value = '';
   document.getElementById('login-error').textContent = '';
+  showView('instances');
 }
 
-// ── Clock ──────────────────────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  document.getElementById('clock').textContent = now.toLocaleTimeString('es-CO', { hour12: false });
-  document.getElementById('date-display').textContent = now.toLocaleDateString('es-CO', { weekday:'short', year:'numeric', month:'short', day:'numeric' }).toUpperCase();
-}
+// ── Views ───────────────────────────────────────────────────────
+function showView(view) {
+  activeView = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view)?.classList.add('active');
 
-// ── API helper ─────────────────────────────────────────────────
-async function api(method, path, body) {
-  const res = await fetch(path, {
-    method,
-    headers: { 'x-api-key': _apiKey, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-    body: body ? JSON.stringify(body) : undefined
+  const navTarget = view === 'detail' ? 'instances' : view;
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => {
+    n.classList.toggle('active', n.dataset.view === navTarget);
   });
-  if (res.status === 401) { doLogout(); throw new Error('sesión expirada'); }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
 }
 
-// ── Polling ────────────────────────────────────────────────────
-function startPolling() {
-  stopPolling();
-  poll();
-  pollTimer = setInterval(poll, 3000);
-}
-
-function stopPolling() {
-  clearInterval(pollTimer);
-  pollTimer = null;
-}
+// ── Polling ─────────────────────────────────────────────────────
+function startPolling() { stopPolling(); poll(); pollTimer = setInterval(poll, 3000); }
+function stopPolling()  { clearInterval(pollTimer); pollTimer = null; }
 
 async function poll() {
   try {
     const data = await api('GET', '/status');
-    updateInstances(data.instances || []);
-    fetchAllWebhooks(data.instances || []);
+    instancesData = data.instances || [];
+    renderInstancesGrid(instancesData);
+    await fetchAllWebhooks(instancesData);
+    if (activeView === 'detail' && detailName) refreshDetailDynamic(detailName);
     fetchLogs();
   } catch (_) {}
 }
 
-// ── Update instancias SIN reescribir el DOM completo ───────────
-function updateInstances(instances) {
+// ── Instances grid ──────────────────────────────────────────────
+function renderInstancesGrid(instances) {
   const grid = document.getElementById('instances-grid');
 
   if (!instances.length) {
-    grid.innerHTML = '<div class="empty-state"><span class="big">[∅]</span>no hay instancias activas — crea una nueva</div>';
-    existingCards.clear();
-    qrStore = {};
+    grid.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">📱</div>
+      <p>${t('instances.empty')}</p>
+    </div>`;
     return;
   }
 
-  instances.forEach(inst => {
-    if (inst.status === 'connected') delete qrStore[inst.name];
+  const names = new Set(instances.map(i => i.name));
+  grid.querySelectorAll('.instance-card').forEach(el => {
+    if (!names.has(el.dataset.name)) el.remove();
   });
-
-  const currentNames = new Set(instances.map(i => i.name));
-
-  existingCards.forEach(name => {
-    if (!currentNames.has(name)) {
-      document.getElementById('card-' + name)?.remove();
-      existingCards.delete(name);
-    }
-  });
-
   grid.querySelector('.empty-state')?.remove();
 
   instances.forEach(inst => {
-    const existing = document.getElementById('card-' + inst.name);
+    const existing = grid.querySelector(`[data-name="${CSS.escape(inst.name)}"]`);
     if (existing) {
       updateCard(existing, inst);
     } else {
-      const div = document.createElement('div');
-      div.innerHTML = buildCardHTML(inst, true);
-      grid.appendChild(div.firstElementChild);
-      existingCards.add(inst.name);
+      const el = document.createElement('div');
+      el.innerHTML = buildCard(inst, true);
+      grid.appendChild(el.firstElementChild);
     }
   });
 }
 
+function buildCard(inst, isNew) {
+  const qr = inst.status === 'qr' && qrStore[inst.name];
+  return `<div class="instance-card${isNew ? ' new-card' : ''}" data-name="${escHtml(inst.name)}">
+    <div class="card-top">
+      <div>
+        <div class="card-name">${escHtml(inst.name)}</div>
+        <div class="card-phone">${inst.phone ? '+' + inst.phone : '—'}</div>
+      </div>
+      <span class="status-badge ${inst.status}">${t('status.' + inst.status) || inst.status}</span>
+    </div>
+    ${qr ? buildQrBlock(inst.name) : ''}
+    <div class="card-meta">
+      ${t('instances.connected')} <span>${inst.connectedAt ? fmtDate(inst.connectedAt) : '—'}</span>
+    </div>
+    <div class="card-footer">
+      <button class="btn btn-secondary" style="font-size:0.8rem" data-action="open-detail" data-name="${escHtml(inst.name)}">
+        ${t('instances.view_detail')}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
 function updateCard(el, inst) {
-  el.className = 'instance-card ' + inst.status;
-
-  const badge = el.querySelector('.badge');
-  if (badge) {
-    badge.className = 'badge ' + inst.status;
-    badge.textContent = statusLabel(inst.status);
-  }
-
-  const phone = el.querySelector('.instance-phone');
-  if (phone) phone.textContent = inst.phone ? '📱 ' + inst.phone : 'sin número';
-
+  el.querySelector('.status-badge').className = `status-badge ${inst.status}`;
+  el.querySelector('.status-badge').textContent = t('status.' + inst.status) || inst.status;
+  el.querySelector('.card-phone').textContent = inst.phone ? '+' + inst.phone : '—';
   const meta = el.querySelector('.card-meta');
-  if (meta) meta.innerHTML = buildMeta(inst);
+  if (meta) meta.innerHTML = `${t('instances.connected')} <span>${inst.connectedAt ? fmtDate(inst.connectedAt) : '—'}</span>`;
 
   const existingQr = el.querySelector('.qr-wrap');
   if (inst.status === 'qr' && qrStore[inst.name]) {
     if (!existingQr) {
       const div = document.createElement('div');
-      div.innerHTML = buildQrHTML(inst.name);
-      el.querySelector('.card-meta')?.insertAdjacentElement('beforebegin', div.firstElementChild);
+      div.innerHTML = buildQrBlock(inst.name);
+      el.querySelector('.card-top').insertAdjacentElement('afterend', div.firstElementChild);
     }
   } else if (existingQr) {
     existingQr.remove();
   }
-
-  const hooksEl = el.querySelector('.webhooks-section');
-  if (hooksEl) hooksEl.innerHTML = buildWebhooksHTML(inst.name);
-
-  const actions = el.querySelector('.card-actions');
-  if (actions) actions.innerHTML = buildActions(inst);
 }
 
-function buildCardHTML(inst, isNew) {
-  return '<div class="instance-card ' + inst.status + (isNew ? ' new-card' : '') + '" id="card-' + inst.name + '">' +
-    '<div class="card-header"><div>' +
-    '<div class="instance-name">' + escHtml(inst.name) + '</div>' +
-    '<div class="instance-phone">' + (inst.phone ? '📱 ' + inst.phone : 'sin número') + '</div>' +
-    '</div><span class="badge ' + inst.status + '">' + statusLabel(inst.status) + '</span></div>' +
-    (inst.status === 'qr' && qrStore[inst.name] ? buildQrHTML(inst.name) : '') +
-    '<div class="card-meta">' + buildMeta(inst) + '</div>' +
-    '<div class="webhooks-section" id="hooks-' + inst.name + '">' + buildWebhooksHTML(inst.name) + '</div>' +
-    '<div class="card-actions">' + buildActions(inst) + '</div></div>';
+function buildQrBlock(name) {
+  return `<div class="qr-wrap">
+    <div class="qr-label">${t('qr.label')}</div>
+    <img src="${qrStore[name]}" alt="QR ${escHtml(name)}">
+    <div class="qr-hint">${t('qr.hint')}</div>
+  </div>`;
 }
 
-function statusLabel(s) {
-  return { connected:'CONECTADO', connecting:'CONECTANDO…', qr:'ESCANEA QR', logged_out:'SESIÓN CERRADA', disconnected:'DESCONECTADO' }[s] || s.toUpperCase();
+// ── Instance detail ──────────────────────────────────────────────
+function openDetail(name) {
+  detailName = name;
+  showView('detail');
+  renderDetail(name);
 }
 
-function buildMeta(inst) {
-  const since = inst.connectedAt ? new Date(inst.connectedAt).toLocaleString('es-CO', { hour12: false }) : '—';
-  return 'CONECTADO DESDE <span>' + since + '</span><br>ESTADO &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span>' + inst.status + '</span>';
+function renderDetail(name) {
+  const inst = instancesData.find(i => i.name === name);
+  if (!inst) { showView('instances'); return; }
+
+  document.getElementById('detail-title').textContent = name;
+  document.getElementById('detail-badge').innerHTML =
+    `<span class="status-badge ${inst.status}">${t('status.' + inst.status) || inst.status}</span>`;
+
+  renderDetailActions(inst);
+  renderDetailContent(inst);
 }
 
-function buildQrHTML(name) {
-  return '<div class="qr-wrap">' +
-    '<div class="qr-label">▶ ESCANEA CON WHATSAPP ◀</div>' +
-    '<img src="' + qrStore[name] + '" alt="QR ' + escHtml(name) + '">' +
-    '<div style="font-size:0.62rem;color:var(--text-faint)">el QR expira en ~20s</div></div>';
+function refreshDetailDynamic(name) {
+  const inst = instancesData.find(i => i.name === name);
+  if (!inst) return;
+
+  const badge = document.getElementById('detail-badge');
+  if (badge) badge.innerHTML = `<span class="status-badge ${inst.status}">${t('status.' + inst.status) || inst.status}</span>`;
+
+  renderDetailActions(inst);
+
+  const qrEl = document.getElementById('detail-qr-section');
+  if (qrEl) qrEl.innerHTML = (inst.status === 'qr' && qrStore[name]) ? buildQrBlock(name) : '';
+
+  const whEl = document.getElementById('detail-webhooks-list');
+  if (whEl) whEl.innerHTML = buildWebhooksList(name);
 }
 
-function buildActions(inst) {
+function renderDetailActions(inst) {
+  const bar = document.getElementById('detail-actions');
   if (inst.status === 'connected') {
-    return '<button class="btn btn-danger" data-action="disconnect" data-name="' + escHtml(inst.name) + '">DESCONECTAR</button>';
-  }
-  return '<button class="btn btn-warn" data-action="reconnect" data-name="' + escHtml(inst.name) + '">RECONECTAR</button>' +
-         '<button class="btn btn-danger" data-action="disconnect" data-name="' + escHtml(inst.name) + '">ELIMINAR</button>';
-}
-
-// ── Webhooks ────────────────────────────────────────────────────
-function buildWebhooksHTML(name) {
-  const hooks = webhookStore[name] || [];
-  let html = '<div class="webhooks-title">WEBHOOKS <button class="btn btn-primary btn-add-hook" data-action="add-hook" data-name="' + escHtml(name) + '">+ AGREGAR</button></div>';
-  if (!hooks.length) {
-    html += '<div class="webhook-empty">sin webhooks configurados</div>';
+    bar.innerHTML = `<button class="btn btn-danger" data-action="disconnect" data-name="${escHtml(inst.name)}">${t('detail.disconnect')}</button>`;
   } else {
-    for (const h of hooks) {
-      const shortUrl = h.url.length > 40 ? h.url.slice(0, 38) + '…' : h.url;
-      html += '<div class="webhook-item">' +
-        '<span class="webhook-url" title="' + escHtml(h.url) + '">' + escHtml(shortUrl) + '</span>' +
-        '<span class="webhook-events">' + h.events.join(', ') + '</span>' +
-        '<button class="webhook-del" data-action="del-hook" data-name="' + escHtml(name) + '" data-hook-id="' + h.id + '">X</button>' +
-        '</div>';
-    }
+    bar.innerHTML = `
+      <button class="btn btn-secondary" data-action="reconnect" data-name="${escHtml(inst.name)}">${t('detail.reconnect')}</button>
+      <button class="btn btn-danger" data-action="disconnect" data-name="${escHtml(inst.name)}">${t('detail.delete')}</button>`;
   }
-  return html;
 }
 
+function renderDetailContent(inst) {
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-grid">
+      <div id="detail-qr-section">${(inst.status === 'qr' && qrStore[inst.name]) ? buildQrBlock(inst.name) : ''}</div>
+
+      <div class="detail-card">
+        <div class="detail-card-title">${t('detail.info')}</div>
+        <div class="info-row">
+          <span class="info-row-label">${t('detail.status')}</span>
+          <span class="info-row-value">${inst.status}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">${t('detail.number')}</span>
+          <span class="info-row-value">${inst.phone ? '+' + inst.phone : '—'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-row-label">${t('detail.connected_since')}</span>
+          <span class="info-row-value">${inst.connectedAt ? fmtDate(inst.connectedAt) : '—'}</span>
+        </div>
+      </div>
+
+      <div class="detail-card" style="grid-column:1/-1">
+        <div class="detail-card-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <span>${t('detail.webhooks')}</span>
+          <button class="btn btn-primary" style="font-size:0.8rem" data-action="add-hook" data-name="${escHtml(inst.name)}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            ${t('detail.webhooks.add')}
+          </button>
+        </div>
+        <div id="detail-webhooks-list">${buildWebhooksList(inst.name)}</div>
+      </div>
+    </div>`;
+}
+
+function buildWebhooksList(name) {
+  const hooks = webhookStore[name] || [];
+  if (!hooks.length) return `<div class="webhook-empty">${t('detail.webhooks.empty')}</div>`;
+  return `<div class="webhook-list">${hooks.map(h => `
+    <div class="webhook-row">
+      <span class="webhook-row-url" title="${escHtml(h.url)}">${escHtml(h.url)}</span>
+      <div class="webhook-row-events">${h.events.map(e => `<span class="event-tag">${e}</span>`).join('')}</div>
+      <button class="webhook-row-del" data-action="del-hook" data-name="${escHtml(name)}" data-hook-id="${h.id}" title="Delete">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ── Webhooks CRUD ───────────────────────────────────────────────
 async function fetchWebhooks(name) {
   try {
-    const data = await api('GET', '/instances/' + name + '/webhooks');
+    const data = await api('GET', `/instances/${name}/webhooks`);
     webhookStore[name] = data.webhooks || [];
-  } catch (_) {
-    webhookStore[name] = [];
-  }
+  } catch (_) { webhookStore[name] = []; }
 }
 
 async function fetchAllWebhooks(instances) {
   for (const inst of instances) {
-    if (inst.status === 'connected') {
-      fetchWebhooks(inst.name);
-    }
+    if (inst.status === 'connected') fetchWebhooks(inst.name);
   }
 }
 
 function openWebhookModal(name) {
   document.getElementById('webhook-instance').value = name;
   document.getElementById('webhook-url-input').value = '';
-  document.querySelectorAll('#webhook-modal .modal-checks input').forEach(cb => { cb.checked = cb.value === 'messages'; });
-  document.getElementById('webhook-modal').classList.remove('hidden');
+  document.querySelectorAll('#modal-webhook .checks-group input').forEach(cb => {
+    cb.checked = cb.value === 'messages';
+  });
+  document.getElementById('modal-webhook').classList.remove('hidden');
   setTimeout(() => document.getElementById('webhook-url-input').focus(), 50);
 }
 
-function closeWebhookModal() {
-  document.getElementById('webhook-modal').classList.add('hidden');
-}
+function closeWebhookModal() { document.getElementById('modal-webhook').classList.add('hidden'); }
 
 async function createWebhook() {
-  const name = document.getElementById('webhook-instance').value;
-  const url = document.getElementById('webhook-url-input').value.trim();
-  const events = Array.from(document.querySelectorAll('#webhook-modal .modal-checks input:checked')).map(cb => cb.value);
+  const name   = document.getElementById('webhook-instance').value;
+  const url    = document.getElementById('webhook-url-input').value.trim();
+  const events = Array.from(document.querySelectorAll('#modal-webhook .checks-group input:checked')).map(cb => cb.value);
 
-  if (!url) { toast('err', 'Ingresa la URL del webhook'); return; }
-  if (!events.length) { toast('err', 'Selecciona al menos un evento'); return; }
+  if (!url)          { toast('err', t('val.enter_url'));    return; }
+  if (!events.length){ toast('err', t('val.select_event')); return; }
 
   closeWebhookModal();
   try {
-    await api('POST', '/instances/' + name + '/webhooks', { url, events });
-    toast('ok', 'Webhook agregado');
+    await api('POST', `/instances/${name}/webhooks`, { url, events });
+    toast('ok', t('toast.webhook.added'));
     await fetchWebhooks(name);
-    const hooksEl = document.getElementById('hooks-' + name);
-    if (hooksEl) hooksEl.innerHTML = buildWebhooksHTML(name);
-  } catch (e) { toast('err', 'Error: ' + e.message); }
+    const el = document.getElementById('detail-webhooks-list');
+    if (el) el.innerHTML = buildWebhooksList(name);
+  } catch (e) { toast('err', e.message); }
 }
 
 async function deleteWebhook(name, hookId) {
-  if (!confirm('¿Eliminar este webhook?')) return;
+  if (!confirm(t('confirm.webhook.delete'))) return;
   try {
-    await api('DELETE', '/instances/' + name + '/webhooks/' + hookId);
-    toast('ok', 'Webhook eliminado');
+    await api('DELETE', `/instances/${name}/webhooks/${hookId}`);
+    toast('ok', t('toast.webhook.deleted'));
     await fetchWebhooks(name);
-    const hooksEl = document.getElementById('hooks-' + name);
-    if (hooksEl) hooksEl.innerHTML = buildWebhooksHTML(name);
-  } catch (e) { toast('err', 'Error: ' + e.message); }
+    const el = document.getElementById('detail-webhooks-list');
+    if (el) el.innerHTML = buildWebhooksList(name);
+  } catch (e) { toast('err', e.message); }
 }
 
-// ── Acciones ───────────────────────────────────────────────────
+// ── Instance actions ────────────────────────────────────────────
 async function reconnectInstance(name) {
-  toast('info', 'Reconectando ' + name + '…');
+  toast('info', `${name}…`);
   try {
-    const data = await api('POST', '/instances/' + name + '/connect');
-    if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', 'QR listo — escanea con WhatsApp'); }
-    else toast('ok', name + ' conectado');
+    const data = await api('POST', `/instances/${name}/connect`);
+    if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', t('toast.qr.ready')); }
+    else toast('ok', `${name} ${t('val.already_connected')}`);
     poll();
-  } catch (e) { toast('err', 'Error: ' + e.message); }
+  } catch (e) { toast('err', e.message); }
 }
 
 async function disconnectInstance(name) {
-  if (!confirm('¿Desconectar y eliminar instancia "' + name + '"?')) return;
+  if (!confirm(`${t('confirm.disconnect')} "${name}"?`)) return;
   try {
-    await api('DELETE', '/instances/' + name);
-    delete qrStore[name];
-    existingCards.delete(name);
-    document.getElementById('card-' + name)?.remove();
-    toast('ok', 'Instancia ' + name + ' eliminada');
-    if (!existingCards.size) {
-      document.getElementById('instances-grid').innerHTML = '<div class="empty-state"><span class="big">[∅]</span>no hay instancias activas — crea una nueva</div>';
-    }
-  } catch (e) { toast('err', 'Error: ' + e.message); }
+    await api('DELETE', `/instances/${name}`);
+    delete qrStore[name]; delete webhookStore[name];
+    instancesData = instancesData.filter(i => i.name !== name);
+    toast('ok', `${name} — ${t('toast.instance.deleted')}`);
+    if (activeView === 'detail') showView('instances');
+    renderInstancesGrid(instancesData);
+  } catch (e) { toast('err', e.message); }
 }
 
-// ── Modal ──────────────────────────────────────────────────────
+// ── New instance modal ──────────────────────────────────────────
 function openNewModal() {
-  document.getElementById('new-modal').classList.remove('hidden');
+  document.getElementById('modal-new').classList.remove('hidden');
   setTimeout(() => document.getElementById('new-name-input').focus(), 50);
 }
-
 function closeNewModal() {
-  document.getElementById('new-modal').classList.add('hidden');
+  document.getElementById('modal-new').classList.add('hidden');
   document.getElementById('new-name-input').value = '';
 }
 
 async function createInstance() {
   const name = document.getElementById('new-name-input').value.trim();
-  if (!name) { toast('err', 'Ingresa un nombre'); return; }
-  if (!/^[a-z0-9_-]+$/i.test(name)) { toast('err', 'Solo letras, números, guiones'); return; }
+  if (!name)                       { toast('err', t('val.enter_name'));    return; }
+  if (!/^[a-z0-9_-]+$/i.test(name)){ toast('err', t('val.invalid_name')); return; }
   closeNewModal();
-  toast('info', 'Iniciando "' + name + '"…');
+  toast('info', `${name}…`);
   try {
-    const data = await api('POST', '/instances/' + name + '/connect');
-    if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', 'QR listo — escanea con WhatsApp'); }
-    else if (data.status === 'connected') toast('ok', '"' + name + '" ya conectado');
+    const data = await api('POST', `/instances/${name}/connect`);
+    if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', t('toast.qr.ready')); }
+    else if (data.status === 'connected') toast('ok', `"${name}" ${t('val.already_connected')}`);
     poll();
-  } catch (e) { toast('err', 'Error: ' + e.message); }
+  } catch (e) { toast('err', e.message); }
 }
 
-// ── Logs ───────────────────────────────────────────────────────
+// ── Logs ────────────────────────────────────────────────────────
 async function fetchLogs() {
   try {
-    const data = await api('GET', '/logs?limit=15');
+    const data = await api('GET', '/logs?limit=20');
     const tbody = document.getElementById('logs-body');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="no-logs">sin registros aún</td></tr>'; return; }
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="no-rows">${t('logs.empty')}</td></tr>`;
+      return;
+    }
     tbody.innerHTML = data.map(log => {
-      const ts = new Date(log.created_at).toLocaleString('es-CO', { hour12: false });
-      const dest = log.to.length > 28 ? log.to.slice(0, 26) + '…' : log.to;
-      const errTip = log.error ? ' title="' + escHtml(log.error) + '"' : '';
-      return '<tr>' +
-        '<td>' + escHtml(log.instance) + '</td>' +
-        '<td style="font-size:0.65rem">' + escHtml(dest) + '</td>' +
-        '<td class="type-' + log.type + '">' + log.type.toUpperCase() + '</td>' +
-        '<td class="' + (log.status === 'ok' ? 'ok' : 'error') + '"' + errTip + '>' + (log.status === 'ok' ? '✓ OK' : '✗ ERROR') + '</td>' +
-        '<td style="color:var(--text-faint)">' + ts + '</td></tr>';
+      const dest    = log.to.length > 32 ? log.to.slice(0, 30) + '…' : log.to;
+      const errTip  = log.error ? ` title="${escHtml(log.error)}"` : '';
+      return `<tr>
+        <td class="td-instance">${escHtml(log.instance)}</td>
+        <td class="td-mono">${escHtml(dest)}</td>
+        <td class="td-type ${log.type}">${log.type}</td>
+        <td class="${log.status === 'ok' ? 'td-ok' : 'td-err'}"${errTip}>${log.status === 'ok' ? '✓ OK' : '✗ Error'}</td>
+        <td class="td-mono" style="color:var(--text-3)">${fmtDate(log.created_at)}</td>
+      </tr>`;
     }).join('');
   } catch (_) {}
 }
 
-// ── Toast ──────────────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────────
 let toastTimer;
 function toast(type, msg) {
   const el = document.getElementById('toast');
@@ -376,56 +412,75 @@ function toast(type, msg) {
   toastTimer = setTimeout(() => el.className = 'hidden', 4000);
 }
 
+// ── Helpers ─────────────────────────────────────────────────────
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString(getLang() === 'es' ? 'es-CO' : 'en-US', { hour12: false, dateStyle: 'short', timeStyle: 'short' });
+}
+
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Event listeners (no inline handlers) ────────────────────────
+// ── Event listeners ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // Apply saved language on load
+  applyTranslations();
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === getLang());
+  });
+
+  // Language toggle
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => setLang(btn.dataset.lang));
+  });
+
   // Login
   document.getElementById('login-btn').addEventListener('click', doLogin);
-  document.getElementById('login-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doLogin();
-  });
+  document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
   // Logout
-  document.querySelector('.btn-logout').addEventListener('click', doLogout);
+  document.getElementById('btn-logout').addEventListener('click', doLogout);
 
-  // New instance modal
-  document.querySelector('[data-id="btn-new-instance"]').addEventListener('click', openNewModal);
-
-  // Refresh logs
-  document.querySelector('[data-id="btn-refresh-logs"]').addEventListener('click', fetchLogs);
-
-  // Modal
-  document.getElementById('new-modal').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('new-modal')) closeNewModal();
+  // Sidebar nav
+  document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.view === 'logs') fetchLogs();
+      showView(btn.dataset.view);
+    });
   });
-  document.querySelector('[data-id="btn-modal-cancel"]').addEventListener('click', closeNewModal);
-  document.querySelector('[data-id="btn-modal-create"]').addEventListener('click', createInstance);
-  document.getElementById('new-name-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') createInstance();
+
+  // New instance
+  document.getElementById('btn-new-instance').addEventListener('click', openNewModal);
+  document.getElementById('btn-modal-cancel').addEventListener('click', closeNewModal);
+  document.getElementById('btn-modal-create').addEventListener('click', createInstance);
+  document.getElementById('new-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
+  document.getElementById('modal-new').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-new')) closeNewModal();
   });
 
   // Webhook modal
-  document.getElementById('webhook-modal').addEventListener('click', (e) => {
-    if (e.target === document.getElementById('webhook-modal')) closeWebhookModal();
-  });
-  document.querySelector('[data-id="btn-hook-cancel"]').addEventListener('click', closeWebhookModal);
-  document.querySelector('[data-id="btn-hook-create"]').addEventListener('click', createWebhook);
-  document.getElementById('webhook-url-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') createWebhook();
+  document.getElementById('btn-hook-cancel').addEventListener('click', closeWebhookModal);
+  document.getElementById('btn-hook-create').addEventListener('click', createWebhook);
+  document.getElementById('webhook-url-input').addEventListener('keydown', e => { if (e.key === 'Enter') createWebhook(); });
+  document.getElementById('modal-webhook').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-webhook')) closeWebhookModal();
   });
 
-  // Delegated click handler for dynamic instance buttons
-  document.getElementById('instances-grid').addEventListener('click', (e) => {
+  // Back
+  document.getElementById('btn-back').addEventListener('click', () => showView('instances'));
+
+  // Refresh logs
+  document.getElementById('btn-refresh-logs').addEventListener('click', fetchLogs);
+
+  // Delegated clicks
+  document.getElementById('main').addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
-    const action = btn.dataset.action;
-    const name = btn.dataset.name;
-    if (action === 'reconnect') reconnectInstance(name);
-    else if (action === 'disconnect') disconnectInstance(name);
-    else if (action === 'add-hook') openWebhookModal(name);
-    else if (action === 'del-hook') deleteWebhook(name, btn.dataset.hookId);
+    const { action, name, hookId } = btn.dataset;
+    if      (action === 'open-detail')  openDetail(name);
+    else if (action === 'reconnect')    reconnectInstance(name);
+    else if (action === 'disconnect')   disconnectInstance(name);
+    else if (action === 'add-hook')     openWebhookModal(name);
+    else if (action === 'del-hook')     deleteWebhook(name, hookId);
   });
 });
