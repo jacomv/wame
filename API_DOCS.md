@@ -1,70 +1,80 @@
-# Documentación de la API — WAME
+# WAME — API Reference
 
-Guía completa para integrar cualquier servicio con la API de WAME y enviar mensajes por WhatsApp.
+Complete guide for integrating any service with WAME.
 
 ---
 
-## Autenticación
+## Authentication
 
-Todas las peticiones requieren el header `x-api-key` con la clave configurada en la variable de entorno `API_KEY`.
+All requests (except `/health`) require the `x-api-key` header.
 
 ```
-x-api-key: tu-api-key-segura
+x-api-key: your-api-key
 ```
 
-Si la clave es inválida o no se envía, la API responde con:
+Invalid or missing key returns:
 
 ```json
 { "error": "Unauthorized" }
 ```
 
-**HTTP Status:** `401`
+**HTTP 401**
 
 ---
 
-## Flujo de integración
+## Integration flow
 
 ```
-┌─────────────────┐     ┌──────────┐     ┌──────────┐
-│  Tu Servicio    │────▸│  WAME    │────▸│ WhatsApp │
-│  (CRM, ERP,    │ API │  API     │     │          │
-│   Bot, etc.)   │◂────│          │     │          │
-└─────────────────┘     └──────────┘     └──────────┘
+┌──────────────────┐     ┌──────────┐     ┌───────────┐
+│  Your Service    │────▶│  WAME    │────▶│ WhatsApp  │
+│  (CRM, bot, etc) │ API │          │     │           │
+│                  │◀────│          │◀────│           │
+└──────────────────┘     └──────────┘     └───────────┘
 ```
 
-### Pasos para integrar
-
-1. **Despliega WAME** y configura las variables de entorno.
-2. **Crea una instancia** con `POST /instances/:name/connect`.
-3. **Escanea el QR** que devuelve la API con la app de WhatsApp.
-4. **Verifica la conexión** con `GET /instances/:name/status`.
-5. **Envía mensajes** con `POST /instances/:name/send`.
+1. Deploy WAME and set `API_KEY`.
+2. Connect an instance — `POST /instances/:name/connect`.
+3. Scan the returned QR with WhatsApp.
+4. Send messages — `POST /instances/:name/send`.
+5. Register a webhook to receive incoming events — `POST /instances/:name/webhooks`.
 
 ---
 
 ## Endpoints
 
-### 1. Estado general
+### Health check
+
+```
+GET /health
+```
+
+No authentication required. For load balancers and Docker health checks.
+
+```json
+{ "ok": true, "uptime": 3600.12 }
+```
+
+---
+
+### All instances status
 
 ```
 GET /status
 ```
 
-Devuelve el estado de todas las instancias registradas.
-
-**Respuesta:**
+**Response:**
 
 ```json
 {
   "instances": [
     {
-      "name": "ventas",
+      "name": "sales",
       "status": "connected",
-      "phone": "5491155551234",
+      "phone": "5215551234567",
       "connectedAt": "2025-01-15T10:30:00.000Z"
     },
     {
-      "name": "soporte",
+      "name": "support",
       "status": "qr",
       "phone": null,
       "connectedAt": null
@@ -73,25 +83,19 @@ Devuelve el estado de todas las instancias registradas.
 }
 ```
 
-**Estados posibles:** `connecting`, `qr`, `connected`, `logged_out`, `disconnected`
+**Possible statuses:** `connecting` `qr` `connected` `logged_out` `disconnected`
 
 ---
 
-### 2. Conectar instancia
+### Connect instance
 
 ```
 POST /instances/:name/connect
 ```
 
-Crea o reconecta una instancia de WhatsApp. Si es la primera vez, devuelve un código QR para escanear.
+Creates or reconnects a WhatsApp instance. Instance names accept `[a-zA-Z0-9_-]`, max 64 chars.
 
-**Parámetros de URL:**
-
-| Parámetro | Tipo | Descripción |
-|-----------|------|-------------|
-| `name` | string | Identificador único de la instancia (alfanumérico y guiones) |
-
-**Respuesta (nueva instancia):**
+**New instance — returns QR:**
 
 ```json
 {
@@ -100,277 +104,319 @@ Crea o reconecta una instancia de WhatsApp. Si es la primera vez, devuelve un c�
 }
 ```
 
-**Respuesta (instancia existente reconectada):**
+**Already connected:**
 
 ```json
-{
-  "status": "connected"
-}
+{ "status": "connected" }
 ```
 
-**Ejemplo:**
-
 ```bash
-curl -X POST http://localhost:3000/instances/ventas/connect \
-  -H "x-api-key: tu-api-key"
+curl -X POST http://localhost:3000/instances/sales/connect \
+  -H "x-api-key: your-api-key"
 ```
 
 ---
 
-### 3. Estado de instancia
+### Instance status
 
 ```
 GET /instances/:name/status
 ```
 
-Devuelve el estado detallado de una instancia, incluyendo el QR si está pendiente de escaneo.
-
-**Respuesta:**
+Returns the detailed status of a single instance, including the QR image if pending.
 
 ```json
 {
-  "name": "ventas",
+  "name": "sales",
   "status": "connected",
   "qr": null,
-  "phone": "5491155551234",
+  "phone": "5215551234567",
   "connectedAt": "2025-01-15T10:30:00.000Z"
 }
 ```
 
 ---
 
-### 4. Enviar mensaje
+### Send message
 
 ```
 POST /instances/:name/send
 ```
 
-Envía un mensaje a un número de teléfono o grupo de WhatsApp.
+**Body fields:**
 
-**Headers:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `to` | string | Yes | Phone number (`5215551234567`) or group JID (`id@g.us`). `@s.whatsapp.net` is appended automatically for individual numbers. |
+| `type` | string | Yes | `text` `image` `audio` `document` |
+| `text` | string | For `text` | Message body |
+| `url` | string | For media | Public URL of the file (HTTP/HTTPS only) |
+| `caption` | string | No | Caption for `image` |
+| `filename` | string | No | File name for `document` |
+| `mimetype` | string | No | MIME type for `document` (default: `application/octet-stream`) or `audio` (default: `audio/mpeg`) |
+| `ptt` | boolean | No | Send as voice note for `audio` (default: `false`) |
 
-```
-Content-Type: application/json
-x-api-key: tu-api-key
-```
+**`to` format:**
 
-**Campos del body:**
+- Individual: country code + number, no `+` or spaces — e.g. `5215551234567` (Mexico), `573001234567` (Colombia)
+- Group: use the JID returned by `/groups` — e.g. `120363012345678901@g.us`
 
-| Campo | Tipo | Obligatorio | Descripción |
-|-------|------|-------------|-------------|
-| `to` | string | Sí | Número de teléfono (ej: `5491155551234`) o ID de grupo (`id@g.us`). El sufijo `@s.whatsapp.net` se agrega automáticamente si no se incluye |
-| `type` | string | Sí | Tipo de mensaje: `text`, `image`, `audio`, `document` |
-| `text` | string | Solo para `text` | Contenido del mensaje de texto |
-| `url` | string | Solo para media | URL del archivo (imagen, audio, documento) |
-| `caption` | string | No | Pie de foto (solo para `image`) |
-| `filename` | string | No | Nombre del archivo (solo para `document`) |
-| `mimetype` | string | No | Tipo MIME del archivo (solo para `document`, default: `application/octet-stream`) |
-| `ptt` | boolean | No | Enviar como nota de voz (solo para `audio`, default: `false`) |
-
-**Formato del campo `to`:**
-
-- **Contactos individuales:** solo el número con código de país, sin `+` ni espacios
-  - Ejemplo: `5491155551234` (Argentina), `521555123456` (México), `34612345678` (España)
-  - También acepta el formato completo: `5491155551234@s.whatsapp.net`
-- **Grupos:** usa el ID del grupo tal como lo devuelve el endpoint `/groups`
-  - Ejemplo: `120363012345678901@g.us`
-
-#### Enviar texto
+#### Text
 
 ```bash
-curl -X POST http://localhost:3000/instances/ventas/send \
-  -H "x-api-key: tu-api-key" \
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
   -H "Content-Type: application/json" \
-  -d '{
-    "to": "5491155551234",
-    "type": "text",
-    "text": "Hola, tu pedido #1234 ha sido enviado."
-  }'
+  -d '{"to": "5215551234567", "type": "text", "text": "Your order #1234 has shipped."}'
 ```
 
-#### Enviar imagen
+#### Image
 
 ```bash
-curl -X POST http://localhost:3000/instances/ventas/send \
-  -H "x-api-key: tu-api-key" \
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
   -H "Content-Type: application/json" \
-  -d '{
-    "to": "5491155551234",
-    "type": "image",
-    "url": "https://ejemplo.com/factura.png",
-    "caption": "Tu factura del mes de enero"
-  }'
+  -d '{"to": "5215551234567", "type": "image", "url": "https://example.com/invoice.png", "caption": "January invoice"}'
 ```
 
-#### Enviar audio
+#### Audio / voice note
 
 ```bash
-curl -X POST http://localhost:3000/instances/ventas/send \
-  -H "x-api-key: tu-api-key" \
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
   -H "Content-Type: application/json" \
-  -d '{
-    "to": "5491155551234",
-    "type": "audio",
-    "url": "https://ejemplo.com/mensaje.mp3",
-    "ptt": true
-  }'
+  -d '{"to": "5215551234567", "type": "audio", "url": "https://example.com/message.mp3", "ptt": true}'
 ```
 
-#### Enviar documento
+#### Document
 
 ```bash
-curl -X POST http://localhost:3000/instances/ventas/send \
-  -H "x-api-key: tu-api-key" \
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
   -H "Content-Type: application/json" \
-  -d '{
-    "to": "5491155551234",
-    "type": "document",
-    "url": "https://ejemplo.com/reporte.pdf",
-    "filename": "reporte-enero-2025.pdf",
-    "mimetype": "application/pdf"
-  }'
+  -d '{"to": "5215551234567", "type": "document", "url": "https://example.com/report.pdf", "filename": "report-jan-2025.pdf", "mimetype": "application/pdf"}'
 ```
 
-**Respuesta exitosa:**
+**Success:** `{ "ok": true }`
 
-```json
-{ "ok": true }
-```
+**Errors:**
 
-**Errores:**
-
-| Status | Respuesta | Causa |
-|--------|-----------|-------|
-| 400 | `{ "error": "Faltan campos: to, type" }` | Campos obligatorios no enviados |
-| 503 | `{ "error": "Instancia \"ventas\" no conectada" }` | Instancia no está conectada |
-| 500 | `{ "error": "mensaje de error" }` | Error interno al enviar |
+| Status | Cause |
+|--------|-------|
+| 400 | Missing `to` / `type`, invalid phone format, unsupported message type |
+| 503 | Instance not connected |
+| 500 | Internal send error |
 
 ---
 
-### 5. Listar grupos
+### List groups
 
 ```
 GET /instances/:name/groups
 ```
 
-Devuelve todos los grupos en los que participa la instancia.
-
-**Respuesta:**
+Returns all groups the instance is part of.
 
 ```json
 [
-  {
-    "id": "120363012345678901@g.us",
-    "name": "Equipo de ventas",
-    "participants": 15
-  },
-  {
-    "id": "120363098765432101@g.us",
-    "name": "Soporte técnico",
-    "participants": 8
-  }
+  { "id": "120363012345678901@g.us", "name": "Sales team", "participants": 15 },
+  { "id": "120363098765432101@g.us", "name": "Support",    "participants": 8  }
 ]
-```
-
-**Ejemplo:**
-
-```bash
-curl http://localhost:3000/instances/ventas/groups \
-  -H "x-api-key: tu-api-key"
 ```
 
 ---
 
-### 6. Participantes de un grupo
+### Group participants
 
 ```
 GET /instances/:name/groups/:groupId/participants
 ```
 
-Devuelve la lista completa de participantes de un grupo con su JID, número de teléfono y rol.
-
-**Parámetros de URL:**
-
-| Parámetro | Tipo | Descripción |
-|-----------|------|-------------|
-| `name` | string | Nombre de la instancia |
-| `groupId` | string | ID del grupo (ej: `120363012345678901@g.us`) |
-
-**Respuesta:**
-
 ```json
 [
-  {
-    "id": "573044487044@s.whatsapp.net",
-    "phone": "573044487044",
-    "admin": null
-  },
-  {
-    "id": "573001234567@s.whatsapp.net",
-    "phone": "573001234567",
-    "admin": "admin"
-  }
+  { "id": "5215551234567@s.whatsapp.net", "phone": "5215551234567", "admin": null },
+  { "id": "5215559876543@s.whatsapp.net", "phone": "5215559876543", "admin": "admin" }
 ]
 ```
 
-**Valores posibles de `admin`:** `null` (miembro normal), `"admin"`, `"superadmin"`
-
-**Ejemplo:**
-
-```bash
-curl http://localhost:3000/instances/ibsg/groups/120363012345678901@g.us/participants \
-  -H "x-api-key: tu-api-key"
-```
+`admin` values: `null` (regular member) · `"admin"` · `"superadmin"`
 
 ---
 
-### 7. Desconectar instancia
+### Disconnect instance
 
 ```
 DELETE /instances/:name
 ```
 
-Cierra la sesión de WhatsApp y elimina los datos de la instancia.
-
-**Respuesta:**
+Logs out from WhatsApp and deletes the session files.
 
 ```json
 { "ok": true }
 ```
 
-**Error (instancia no encontrada):**
+---
+
+## Webhooks
+
+Webhooks let you receive real-time events from WhatsApp (incoming messages, group changes) sent as HTTP POST requests to your endpoint.
+
+**Available events:**
+
+| Event | Triggered when |
+|-------|----------------|
+| `messages` | A message is received (text, image, audio, document, video) |
+| `group.join` | Someone joins a group |
+| `group.leave` | Someone leaves a group |
+
+**Payload shape:**
 
 ```json
-{ "error": "Instancia no encontrada" }
+{
+  "event": "messages",
+  "instance": "sales",
+  "timestamp": "2025-01-15T10:30:00.000Z",
+  "data": {
+    "from": "5215551234567@s.whatsapp.net",
+    "pushName": "John",
+    "type": "text",
+    "text": "Hello!",
+    "messageId": "ABCDEF123456",
+    "isGroup": false
+  }
+}
 ```
 
-**HTTP Status:** `404`
+Webhooks are fire-and-forget with a 5-second timeout per attempt.
 
 ---
 
-### 8. Registros de mensajes
+### Register webhook
+
+```
+POST /instances/:name/webhooks
+```
+
+```json
+{
+  "url": "https://your-server.com/webhook",
+  "events": ["messages"]
+}
+```
+
+**Response `201`:**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "url": "https://your-server.com/webhook",
+  "events": ["messages"],
+  "createdAt": "2025-01-15T10:30:00.000Z"
+}
+```
+
+---
+
+### List webhooks
+
+```
+GET /instances/:name/webhooks
+```
+
+```json
+{
+  "webhooks": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "url": "https://your-server.com/webhook",
+      "events": ["messages"],
+      "createdAt": "2025-01-15T10:30:00.000Z"
+    }
+  ],
+  "availableEvents": ["messages", "group.join", "group.leave"]
+}
+```
+
+---
+
+### Update webhook
+
+```
+PUT /instances/:name/webhooks/:id
+```
+
+Replace the URL and/or events of an existing webhook.
+
+```json
+{
+  "url": "https://your-server.com/webhook-v2",
+  "events": ["messages", "group.join"]
+}
+```
+
+Returns the updated webhook object.
+
+---
+
+### Delete webhook
+
+```
+DELETE /instances/:name/webhooks/:id
+```
+
+```json
+{ "ok": true }
+```
+
+---
+
+### Test webhooks
+
+```
+POST /instances/:name/webhooks/test
+```
+
+Fires a test `messages` payload to all registered webhooks for the instance and reports the result.
+
+```json
+{
+  "results": [
+    {
+      "url": "https://your-server.com/webhook",
+      "events": ["messages"],
+      "httpStatus": 200,
+      "ok": true,
+      "response": "ok"
+    }
+  ]
+}
+```
+
+---
+
+## Message logs
 
 ```
 GET /logs
 ```
 
-Devuelve el historial de mensajes enviados.
+Returns sent message history (stored in embedded SQLite).
 
-**Parámetros de query:**
+**Query params:**
 
-| Parámetro | Tipo | Obligatorio | Descripción |
-|-----------|------|-------------|-------------|
-| `instance` | string | No | Filtrar por nombre de instancia |
-| `limit` | number | No | Cantidad de registros (default: `20`) |
+| Param | Type | Default | Max | Description |
+|-------|------|---------|-----|-------------|
+| `instance` | string | — | — | Filter by instance name |
+| `limit` | number | `20` | `100` | Number of records |
 
-**Respuesta:**
+**Response:**
 
 ```json
 [
   {
-    "id": 42,
-    "instance": "ventas",
-    "to": "5491155551234",
+    "id": 1,
+    "instance": "sales",
+    "to": "5215551234567@s.whatsapp.net",
     "type": "text",
     "status": "ok",
     "error": null,
@@ -379,47 +425,32 @@ Devuelve el historial de mensajes enviados.
 ]
 ```
 
-**Ejemplo:**
-
 ```bash
-curl "http://localhost:3000/logs?instance=ventas&limit=50" \
-  -H "x-api-key: tu-api-key"
+curl "http://localhost:3000/logs?instance=sales&limit=50" \
+  -H "x-api-key: your-api-key"
 ```
 
 ---
 
-## Ejemplos de integración
+## Code examples
 
 ### Node.js
 
 ```javascript
-const API_URL = "http://localhost:3000";
-const API_KEY = "tu-api-key";
+const WAME_URL = "http://localhost:3000";
+const API_KEY  = "your-api-key";
 
-async function enviarWhatsApp(instancia, telefono, mensaje) {
-  const response = await fetch(`${API_URL}/instances/${instancia}/send`, {
+async function sendWhatsApp(instance, to, text) {
+  const res = await fetch(`${WAME_URL}/instances/${instance}/send`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": API_KEY,
-    },
-    body: JSON.stringify({
-      to: telefono,
-      type: "text",
-      text: mensaje,
-    }),
+    headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+    body: JSON.stringify({ to, type: "text", text }),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error);
-  }
-
-  return response.json();
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json();
 }
 
-// Uso
-await enviarWhatsApp("ventas", "5491155551234", "Tu pedido fue enviado.");
+await sendWhatsApp("sales", "5215551234567", "Your order has shipped.");
 ```
 
 ### Python
@@ -427,230 +458,78 @@ await enviarWhatsApp("ventas", "5491155551234", "Tu pedido fue enviado.");
 ```python
 import requests
 
-API_URL = "http://localhost:3000"
-API_KEY = "tu-api-key"
+WAME_URL = "http://localhost:3000"
+API_KEY  = "your-api-key"
 
-def enviar_whatsapp(instancia: str, telefono: str, mensaje: str):
-    response = requests.post(
-        f"{API_URL}/instances/{instancia}/send",
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": API_KEY,
-        },
-        json={
-            "to": telefono,
-            "type": "text",
-            "text": mensaje,
-        },
+def send_whatsapp(instance: str, to: str, text: str):
+    r = requests.post(
+        f"{WAME_URL}/instances/{instance}/send",
+        headers={"x-api-key": API_KEY},
+        json={"to": to, "type": "text", "text": text},
     )
-    response.raise_for_status()
-    return response.json()
+    r.raise_for_status()
+    return r.json()
 
-# Uso
-enviar_whatsapp("ventas", "5491155551234", "Tu pedido fue enviado.")
+send_whatsapp("sales", "5215551234567", "Your order has shipped.")
 ```
 
 ### PHP
 
 ```php
-<?php
-
-$apiUrl = "http://localhost:3000";
-$apiKey = "tu-api-key";
-
-function enviarWhatsApp(string $instancia, string $telefono, string $mensaje): array
-{
-    $ch = curl_init("$GLOBALS[apiUrl]/instances/$instancia/send");
+function sendWhatsApp(string $instance, string $to, string $text): array {
+    $ch = curl_init("http://localhost:3000/instances/$instance/send");
     curl_setopt_array($ch, [
-        CURLOPT_POST => true,
+        CURLOPT_POST           => true,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => [
-            "Content-Type: application/json",
-            "x-api-key: $GLOBALS[apiKey]",
-        ],
-        CURLOPT_POSTFIELDS => json_encode([
-            "to" => $telefono,
-            "type" => "text",
-            "text" => $mensaje,
-        ]),
+        CURLOPT_HTTPHEADER     => ["Content-Type: application/json", "x-api-key: your-api-key"],
+        CURLOPT_POSTFIELDS     => json_encode(["to" => $to, "type" => "text", "text" => $text]),
     ]);
-
     $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-
-    if ($httpCode !== 200) {
-        throw new Exception("Error al enviar: $response");
-    }
-
+    if ($status !== 200) throw new Exception("Error: $response");
     return json_decode($response, true);
 }
 
-// Uso
-enviarWhatsApp("ventas", "5491155551234", "Tu pedido fue enviado.");
+sendWhatsApp("sales", "5215551234567", "Your order has shipped.");
 ```
 
-### Go
+### n8n / Make / Zapier
 
-```go
-package main
+Configure an HTTP node:
 
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-)
-
-const (
-	apiURL = "http://localhost:3000"
-	apiKey = "tu-api-key"
-)
-
-func enviarWhatsApp(instancia, telefono, mensaje string) error {
-	body, _ := json.Marshal(map[string]string{
-		"to":   telefono,
-		"type": "text",
-		"text": mensaje,
-	})
-
-	req, _ := http.NewRequest("POST",
-		fmt.Sprintf("%s/instances/%s/send", apiURL, instancia),
-		bytes.NewBuffer(body),
-	)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", apiKey)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("error: status %d", resp.StatusCode)
-	}
-	return nil
-}
-
-func main() {
-	err := enviarWhatsApp("ventas", "5491155551234", "Tu pedido fue enviado.")
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-}
-```
-
-### Webhook / n8n / Make (Integromat)
-
-Para integrar con plataformas low-code, configura un nodo HTTP con:
-
-- **URL:** `http://tu-servidor:3000/instances/ventas/send`
-- **Método:** `POST`
-- **Headers:**
-  - `Content-Type`: `application/json`
-  - `x-api-key`: `tu-api-key`
+- **Method:** `POST`
+- **URL:** `http://your-server:3000/instances/sales/send`
+- **Headers:** `x-api-key: your-api-key`, `Content-Type: application/json`
 - **Body:**
 
 ```json
-{
-  "to": "{{telefono}}",
-  "type": "text",
-  "text": "{{mensaje}}"
-}
+{ "to": "{{phone}}", "type": "text", "text": "{{message}}" }
 ```
 
 ---
 
-## Enviar a grupos
+## Error reference
 
-Para enviar mensajes a un grupo, primero obtén el ID del grupo:
-
-```bash
-curl http://localhost:3000/instances/ventas/groups \
-  -H "x-api-key: tu-api-key"
-```
-
-Luego usa el `id` del grupo como valor de `to`:
-
-```bash
-curl -X POST http://localhost:3000/instances/ventas/send \
-  -H "x-api-key: tu-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "to": "120363012345678901@g.us",
-    "type": "text",
-    "text": "Recordatorio: reunión a las 15:00"
-  }'
-```
+| HTTP Status | Meaning | Action |
+|-------------|---------|--------|
+| `400` | Bad request — missing fields, invalid phone, unsupported type | Check `to`, `type`, and phone format |
+| `401` | Unauthorized | Check the `x-api-key` header |
+| `404` | Instance or webhook not found | Verify the name/ID |
+| `429` | Rate limit exceeded | Back off and retry |
+| `500` | Internal server error | Check server logs |
+| `503` | Instance not connected | Reconnect with `/connect` |
 
 ---
 
-## Health check
+## Security
 
-Endpoint sin autenticación, útil para load balancers, Docker health checks y monitoreo:
-
-```bash
-curl http://localhost:3000/health
-```
-
-Respuesta:
-```json
-{
-  "ok": true,
-  "uptime": 3600.123
-}
-```
-
----
-
-## Seguridad
-
-WAME incluye varias capas de protección:
-
-| Mecanismo | Descripción |
-|-----------|-------------|
-| **Helmet** | Headers HTTP de seguridad (X-Frame-Options, CSP, etc.) |
-| **Rate limiting** | 100 req/min global, 30 envíos/min por IP (configurable) |
-| **CORS** | Control de origen cruzado (configurable via `CORS_ORIGIN`) |
-| **Body limit** | Máximo 5 MB por request |
-| **Timing-safe auth** | Comparación en tiempo constante del API key (previene timing attacks) |
-| **Path traversal** | Nombres de instancia validados: solo `[a-zA-Z0-9_-]` |
-| **URL validation** | Solo URLs HTTP/HTTPS en media (previene SSRF con `file://`, etc.) |
-| **Input validation** | Formato de teléfono E.164, tipos de mensaje válidos |
-
----
-
-## Monitor de actualizaciones
-
-Al iniciar, WAME verifica automáticamente si hay nuevas versiones de las dependencias críticas (Baileys, Express, Supabase) consultando el registro de npm. Los avisos aparecen en la consola:
-
-```
-[updater] Verificando actualizaciones de dependencias...
-[updater] ⚠ @whiskeysockets/baileys: instalada 6.7.16 → disponible 6.8.0
-[updater] Ejecuta "npm update" o revisa los changelogs antes de actualizar.
-```
-
----
-
-## Códigos de error
-
-| HTTP Status | Significado | Acción recomendada |
-|-------------|-------------|-------------------|
-| `400` | Campos obligatorios faltantes o formato inválido | Verificar `to`, `type` y formato del número |
-| `401` | API key inválida o no enviada | Verificar el header `x-api-key` |
-| `404` | Instancia no encontrada | Verificar el nombre de la instancia |
-| `429` | Rate limit alcanzado | Esperar y reintentar con backoff |
-| `500` | Error interno del servidor | Revisar logs del servidor |
-| `503` | Instancia no conectada | Reconectar la instancia con `/connect` |
-
----
-
-## Buenas prácticas
-
-1. **Verifica el estado** antes de enviar mensajes para evitar errores 503.
-2. **Usa reintentos** con backoff exponencial para manejar errores transitorios.
-3. **No envíes spam**: WhatsApp puede banear números que envían mensajes masivos no solicitados.
-4. **Guarda la API key** de forma segura; nunca la expongas en código del lado del cliente.
-5. **Monitorea los logs** para detectar errores de envío y actuar rápidamente.
-6. **Usa una instancia por caso de uso** (ej: `ventas`, `soporte`, `notificaciones`) para organizar mejor los envíos.
+| Layer | Details |
+|-------|---------|
+| Timing-safe auth | Constant-time API key comparison (prevents timing attacks) |
+| Helmet | HTTP security headers |
+| Rate limiting | 100 req/min global · 30 send req/min per IP (configurable) |
+| Body limit | 5 MB max per request |
+| SSRF protection | Media URLs must be HTTP/HTTPS — `file://` and others are rejected |
+| Path traversal | Instance names validated to `[a-zA-Z0-9_-]` only |
+| Input validation | Phone format, message type whitelist, webhook URL and event validation |
