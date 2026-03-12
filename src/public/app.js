@@ -230,11 +230,12 @@ function renderDetailActions(inst) {
 }
 
 function renderDetailContent(inst) {
+  const hasQr = inst.status === 'qr' && qrStore[inst.name];
   document.getElementById('detail-content').innerHTML = `
     <div class="detail-grid">
-      <div id="detail-qr-section">${(inst.status === 'qr' && qrStore[inst.name]) ? buildQrBlock(inst.name) : ''}</div>
+      ${hasQr ? `<div id="detail-qr-section">${buildQrBlock(inst.name)}</div>` : '<div id="detail-qr-section" style="display:none"></div>'}
 
-      <div class="detail-card">
+      <div class="detail-card"${!hasQr ? ' style="grid-column:1/-1;max-width:480px"' : ''}>
         <div class="detail-card-title">${t('detail.info')}</div>
         <div class="info-row">
           <span class="info-row-label">${t('detail.status')}</span>
