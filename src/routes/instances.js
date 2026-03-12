@@ -81,6 +81,23 @@ router.get('/:name/groups', requireApiKey, validateInstanceName, async (req, res
   }
 });
 
+// ── Participantes de un grupo ───────────────────────────────────
+router.get('/:name/groups/:groupId/participants', requireApiKey, validateInstanceName, async (req, res) => {
+  const sock = getSocket(req.params.name);
+  if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
+  try {
+    const meta = await sock.groupMetadata(req.params.groupId);
+    const list = meta.participants.map(p => ({
+      id: p.id,
+      phone: p.id.replace('@s.whatsapp.net', '').replace('@c.us', '').split(':')[0],
+      admin: p.admin ?? null,
+    }));
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Test webhook: dispara payload de prueba y reporta resultado ─
 router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, async (req, res) => {
   const { name } = req.params;

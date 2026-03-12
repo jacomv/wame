@@ -1,30 +1,48 @@
-import { createClient } from '@supabase/supabase-js';
+import Database from 'better-sqlite3';
+import { mkdirSync } from 'fs';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+const DATA_DIR = process.env.DATA_DIR || './data';
+mkdirSync(DATA_DIR, { recursive: true });
+
+const db = new Database(`${DATA_DIR}/wame.db`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS message_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    instance TEXT NOT NULL,
+    "to" TEXT NOT NULL,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_message_logs_instance ON message_logs(instance);
+  CREATE INDEX IF NOT EXISTS idx_message_logs_created_at ON message_logs(created_at);
+`);
+
+const stmtInsert = db.prepare(
+  `INSERT INTO message_logs (instance, "to", type, status, error) VALUES (?, ?, ?, ?, ?)`
 );
 
-export async function logMessage({ instance, to, type, status, error = null }) {
-  const { error: dbError } = await supabase
-    .from('whatsapp_logs')
-    .insert({ instance, to, type, status, error });
+const stmtSelectAll = db.prepare(
+  `SELECT * FROM message_logs ORDER BY created_at DESC LIMIT ?`
+);
 
-  if (dbError) {
-    console.error('[logger] Error guardando log:', dbError.message);
+const stmtSelectByInstance = db.prepare(
+  `SELECT * FROM message_logs WHERE instance = ? ORDER BY created_at DESC LIMIT ?`
+);
+
+export function logMessage({ instance, to, type, status, error = null }) {
+  try {
+    stmtInsert.run(instance, to, type, status, error);
+  } catch (err) {
+    console.error('[logger] Error guardando log:', err.message);
   }
 }
 
-export async function getLogs({ instance, limit = 20 }) {
-  let query = supabase
-    .from('whatsapp_logs')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (instance) query = query.eq('instance', instance);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data;
+export function getLogs({ instance, limit = 20 }) {
+  if (instance) {
+    return stmtSelectByInstance.all(instance, limit);
+  }
+  return stmtSelectAll.all(limit);
 }
