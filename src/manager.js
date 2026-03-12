@@ -109,7 +109,9 @@ export async function connectInstance(name) {
         : msg.message?.audioMessage ? 'audio'
         : msg.message?.documentMessage ? 'document'
         : msg.message?.videoMessage ? 'video'
-        : 'other';
+        : null;
+
+      if (!msgType) continue; // Ignorar reacciones, stickers, polls, etc.
 
       dispatch(name, 'messages', {
         from,
