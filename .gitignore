@@ -1,3 +1,5 @@
 .env
 node_modules/
 data/
+.playwright-mcp/
+CLAUDE.md

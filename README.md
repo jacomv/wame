@@ -14,9 +14,9 @@ That's it. No database setup. No external services. One `API_KEY` and you're run
 ## Quick start
 
 ```bash
-git clone https://github.com/your-user/wame.git
+git clone https://github.com/Jacobisaldana/wame.git
 cd wame
-echo "API_KEY=your-secret-key" > .env
+cp .env.example .env   # then edit API_KEY
 docker compose up -d
 ```
 
@@ -29,7 +29,7 @@ Open `http://your-server:3000` — scan the QR, start sending.
 ```yaml
 services:
   wame:
-    image: your-user/wame
+    image: Jacobisaldana/wame
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -51,7 +51,7 @@ Sessions and webhooks are persisted in the `wame_data` volume. No external datab
 Requires Node.js 20+.
 
 ```bash
-git clone https://github.com/your-user/wame.git
+git clone https://github.com/Jacobisaldana/wame.git
 cd wame
 npm install
 echo "API_KEY=your-secret-key" > .env
