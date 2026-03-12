@@ -6,10 +6,11 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { requireApiKey } from './auth.js';
-import { connectInstance, getSocket, getAllStatus, getInstanceStatus, disconnectInstance, restoreExistingSessions, shutdown } from './manager.js';
-import { sendMessage } from './sender.js';
-import { logMessage, getLogs } from './logger.js';
+import { getAllStatus, restoreExistingSessions, shutdown } from './manager.js';
 import { checkUpdates } from './updater.js';
+import instanceRoutes from './routes/instances.js';
+import webhookRoutes from './routes/webhooks.js';
+import logRoutes from './routes/logs.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -40,15 +41,6 @@ app.use(rateLimit({
   message: { error: 'Demasiadas peticiones. Intenta más tarde.' },
 }));
 
-// Rate limiting estricto para envío de mensajes: 30 req/min por IP
-const sendLimiter = rateLimit({
-  windowMs: 60_000,
-  max: parseInt(process.env.SEND_RATE_LIMIT || '30'),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Límite de envío alcanzado. Intenta más tarde.' },
-});
-
 // Servir UI estática (sin auth)
 app.use(express.static(join(__dirname, 'public')));
 
@@ -57,128 +49,13 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
 
-// ── Estado general ──────────────────────────────────────────────
+// ── Rutas ───────────────────────────────────────────────────────
 app.get('/status', requireApiKey, (_req, res) => {
   res.json({ instances: getAllStatus() });
 });
-
-// ── Validar nombre de instancia (prevenir path traversal) ───────
-function validateInstanceName(req, res, next) {
-  const { name } = req.params;
-  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name)) {
-    return res.status(400).json({ error: 'Nombre de instancia inválido. Solo letras, números, _ y - (máx 64 caracteres)' });
-  }
-  next();
-}
-
-// ── Conectar / reconectar instancia ────────────────────────────
-app.post('/instances/:name/connect', requireApiKey, validateInstanceName, async (req, res) => {
-  const { name } = req.params;
-  try {
-    const result = await connectInstance(name);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Estado de una instancia (incluye QR si está pendiente) ─────
-app.get('/instances/:name/status', requireApiKey, validateInstanceName, (req, res) => {
-  const inst = getInstanceStatus(req.params.name);
-  if (!inst) return res.status(404).json({ error: 'Instancia no encontrada' });
-  res.json(inst);
-});
-
-// ── Normalizar JID ──────────────────────────────────────────────
-function normalizeJid(to) {
-  // Si ya es un JID completo (tiene @), solo limpiar espacios
-  if (to.includes('@')) return to.trim();
-  // Solo número: limpiar formato telefónico común
-  const cleaned = to.replace(/[\s+()-]/g, '');
-  return `${cleaned}@s.whatsapp.net`;
-}
-
-// ── Validar número de teléfono ──────────────────────────────────
-function validatePhoneOrJid(to) {
-  const trimmed = to.trim();
-  // Si tiene @, es un JID completo — aceptar formato grupo o individual
-  if (trimmed.includes('@')) {
-    return /^[\w.-]+@(s\.whatsapp\.net|g\.us)$/.test(trimmed);
-  }
-  // Solo número: limpiar formato y validar entre 7 y 15 dígitos (E.164 sin +)
-  const cleaned = trimmed.replace(/[\s+()-]/g, '');
-  return /^\d{7,15}$/.test(cleaned);
-}
-
-// ── Enviar mensaje ──────────────────────────────────────────────
-app.post('/instances/:name/send', requireApiKey, validateInstanceName, sendLimiter, async (req, res) => {
-  const { name } = req.params;
-  const { to, type, ...payload } = req.body;
-
-  if (!to || !type) {
-    return res.status(400).json({ error: 'Faltan campos: to, type' });
-  }
-
-  if (!validatePhoneOrJid(to)) {
-    return res.status(400).json({ error: 'Formato de número/JID inválido' });
-  }
-
-  const jid = normalizeJid(to);
-  const sock = getSocket(name);
-  if (!sock) {
-    return res.status(503).json({ error: `Instancia "${name}" no conectada` });
-  }
-
-  try {
-    await sendMessage(sock, jid, type, payload);
-    await logMessage({ instance: name, to: jid, type, status: 'ok' });
-    res.json({ ok: true });
-  } catch (err) {
-    await logMessage({ instance: name, to: jid, type, status: 'error', error: err.message });
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Listar grupos de una instancia ─────────────────────────────
-app.get('/instances/:name/groups', requireApiKey, validateInstanceName, async (req, res) => {
-  const sock = getSocket(req.params.name);
-  if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
-  try {
-    const groups = await sock.groupFetchAllParticipating();
-    const list = Object.values(groups).map(g => ({
-      id: g.id,
-      name: g.subject,
-      participants: g.participants?.length ?? 0,
-    }));
-    res.json(list);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Desconectar / eliminar instancia ───────────────────────────
-app.delete('/instances/:name', requireApiKey, validateInstanceName, async (req, res) => {
-  const { name } = req.params;
-  try {
-    const ok = await disconnectInstance(name);
-    if (!ok) return res.status(404).json({ error: 'Instancia no encontrada' });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Logs ────────────────────────────────────────────────────────
-app.get('/logs', requireApiKey, async (req, res) => {
-  try {
-    const { instance, limit } = req.query;
-    const parsedLimit = Math.min(parseInt(limit) || 20, 100); // Máximo 100 logs
-    const data = await getLogs({ instance, limit: parsedLimit });
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.use('/instances', instanceRoutes);
+app.use('/instances', webhookRoutes);
+app.use('/logs', logRoutes);
 
 // ── Arranque ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
