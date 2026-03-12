@@ -435,6 +435,19 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => setLang(btn.dataset.lang));
   });
 
+  // Mobile sidebar
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('visible');
+  }
+  document.getElementById('btn-hamburger').addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('visible');
+  });
+  overlay.addEventListener('click', closeSidebar);
+
   // Login
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
@@ -447,6 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => {
       if (btn.dataset.view === 'logs') fetchLogs();
       showView(btn.dataset.view);
+      closeSidebar();
     });
   });
 
