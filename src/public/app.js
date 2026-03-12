@@ -249,7 +249,7 @@ async function fetchWebhooks(name) {
 
 async function fetchAllWebhooks(instances) {
   for (const inst of instances) {
-    if (inst.status === 'connected' && !webhookStore[inst.name]) {
+    if (inst.status === 'connected') {
       fetchWebhooks(inst.name);
     }
   }
