@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -41,511 +41,174 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Login ───────────────────────────────────────────── */
+/* ── Login ── */
 #login-screen {
-  position: fixed;
-  inset: 0;
-  background: var(--bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 500;
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; z-index: 500;
 }
 
 .login-card {
-  background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: 12px;
-  padding: 2.5rem 2rem;
-  width: 100%;
-  max-width: 360px;
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: 12px; padding: 2.5rem 2rem; width: 100%; max-width: 360px;
 }
 
-.login-logo {
-  font-size: 1.6rem;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 0.25rem;
-  letter-spacing: -0.02em;
-}
-
+.login-logo { font-size: 1.6rem; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; letter-spacing: -0.02em; }
 .login-logo span { color: var(--accent); }
+.login-sub { font-size: 0.8rem; color: var(--text-2); margin-bottom: 2rem; }
 
-.login-sub {
-  font-size: 0.8rem;
-  color: var(--text-2);
-  margin-bottom: 2rem;
-}
-
-.field-label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text-2);
-  margin-bottom: 0.4rem;
-}
+.field-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-2); margin-bottom: 0.4rem; }
 
 .field-input {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 0.875rem;
-  padding: 0.6rem 0.85rem;
-  outline: none;
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); font-family: var(--mono);
+  font-size: 0.875rem; padding: 0.6rem 0.85rem; outline: none; margin-bottom: 0.75rem;
   transition: border-color 0.15s, box-shadow 0.15s;
-  margin-bottom: 0.75rem;
 }
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 
-.field-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-dim);
-}
+.login-error { font-size: 0.78rem; color: var(--red); margin-bottom: 0.75rem; min-height: 1.2rem; }
 
-.login-error {
-  font-size: 0.78rem;
-  color: var(--red);
-  margin-bottom: 0.75rem;
-  min-height: 1.2rem;
-}
-
-/* ── Buttons ─────────────────────────────────────────── */
+/* ── Buttons ── */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--font);
-  font-size: 0.825rem;
-  font-weight: 500;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  line-height: 1;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font); font-size: 0.825rem; font-weight: 500;
+  padding: 0.5rem 1rem; border-radius: var(--radius); border: 1px solid transparent;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap; line-height: 1;
 }
-
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.btn-primary {
-  background: var(--accent);
-  color: #000;
-  border-color: var(--accent);
-}
+.btn-primary  { background: var(--accent); color: #000; border-color: var(--accent); }
 .btn-primary:not(:disabled):hover { filter: brightness(1.1); }
-
-.btn-secondary {
-  background: var(--surface-2);
-  color: var(--text);
-  border-color: var(--border);
-}
+.btn-secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
 .btn-secondary:not(:disabled):hover { background: var(--border); }
-
-.btn-ghost {
-  background: transparent;
-  color: var(--text-2);
-  border-color: transparent;
-}
+.btn-ghost { background: transparent; color: var(--text-2); border-color: transparent; }
 .btn-ghost:not(:disabled):hover { background: var(--surface-2); color: var(--text); }
-
-.btn-danger {
-  background: transparent;
-  color: var(--red);
-  border-color: var(--border);
-}
+.btn-danger { background: transparent; color: var(--red); border-color: var(--border); }
 .btn-danger:not(:disabled):hover { background: var(--red-dim); border-color: var(--red); }
-
 .btn-full { width: 100%; justify-content: center; }
 
-/* ── App layout ──────────────────────────────────────── */
-#app {
-  display: flex;
-  min-height: 100vh;
-}
+/* ── App layout ── */
+#app { display: flex; min-height: 100vh; }
 
-/* ── Sidebar ─────────────────────────────────────────── */
+/* ── Sidebar ── */
 #sidebar {
-  width: var(--sidebar-w);
-  flex-shrink: 0;
-  background: var(--surface);
-  border-right: 1px solid var(--border-2);
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  z-index: 100;
+  width: var(--sidebar-w); flex-shrink: 0; background: var(--surface);
+  border-right: 1px solid var(--border-2); display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
 }
 
-.sidebar-logo {
-  padding: 1.25rem 1.25rem 1rem;
-  font-size: 1.15rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  border-bottom: 1px solid var(--border-2);
-  color: var(--text);
-}
-
+.sidebar-logo { padding: 1.25rem 1.25rem 1rem; font-size: 1.15rem; font-weight: 600; letter-spacing: -0.02em; border-bottom: 1px solid var(--border-2); color: var(--text); }
 .sidebar-logo span { color: var(--accent); }
 
-.sidebar-nav {
-  flex: 1;
-  padding: 0.75rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.sidebar-nav { flex: 1; padding: 0.75rem; display: flex; flex-direction: column; gap: 2px; }
 
 .nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 400;
-  color: var(--text-2);
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  font-family: var(--font);
-  width: 100%;
-  text-align: left;
-  transition: all 0.1s;
+  display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.75rem;
+  border-radius: 6px; font-size: 0.875rem; font-weight: 400; color: var(--text-2);
+  cursor: pointer; background: transparent; border: none; font-family: var(--font);
+  width: 100%; text-align: left; transition: all 0.1s;
 }
-
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
-
 .nav-item svg { flex-shrink: 0; opacity: 0.7; }
 .nav-item.active svg { opacity: 1; }
 
-.sidebar-footer {
-  padding: 0.75rem;
-  border-top: 1px solid var(--border-2);
-}
+.sidebar-footer { padding: 0.75rem; border-top: 1px solid var(--border-2); display: flex; flex-direction: column; gap: 0.5rem; }
 
-.user-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0.5rem;
-}
+.user-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; }
+.user-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.user-label { font-size: 0.78rem; color: var(--text-2); flex: 1; }
 
-.user-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
+/* ── Language toggle ── */
+.lang-toggle { display: flex; gap: 4px; padding: 0 0.5rem; }
+.lang-btn {
+  flex: 1; padding: 0.3rem; border-radius: 5px; border: 1px solid var(--border-2);
+  background: transparent; color: var(--text-3); font-family: var(--font);
+  font-size: 0.72rem; font-weight: 500; cursor: pointer; transition: all 0.1s;
+  letter-spacing: 0.04em;
 }
+.lang-btn:hover { background: var(--surface-2); color: var(--text-2); }
+.lang-btn.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(34,197,94,0.25); }
 
-.user-label {
-  font-size: 0.78rem;
-  color: var(--text-2);
-  flex: 1;
-  padding-left: 0.5rem;
-}
-
-/* ── Main content ────────────────────────────────────── */
-#main {
-  flex: 1;
-  margin-left: var(--sidebar-w);
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
+/* ── Main content ── */
+#main { flex: 1; margin-left: var(--sidebar-w); min-width: 0; display: flex; flex-direction: column; }
 
 .view { display: none; flex: 1; flex-direction: column; }
 .view.active { display: flex; }
 
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem 2rem 1rem;
-  border-bottom: 1px solid var(--border-2);
-  gap: 1rem;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.5rem 2rem 1rem; border-bottom: 1px solid var(--border-2); gap: 1rem;
 }
-
-.page-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.page-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
+.page-header-left { display: flex; align-items: center; gap: 0.75rem; }
+.page-title { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.01em; }
 .page-content { padding: 1.5rem 2rem; flex: 1; }
 
-/* ── Instances grid ──────────────────────────────────── */
-#instances-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-}
+/* ── Instances grid ── */
+#instances-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
 
 .instance-card {
-  background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  position: relative;
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: var(--radius); padding: 1.25rem; cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s; position: relative;
 }
+.instance-card:hover { border-color: var(--border); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+.instance-card.new-card { animation: fadeUp 0.2s ease forwards; }
 
-.instance-card:hover {
-  border-color: var(--border);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-.instance-card.new-card {
-  animation: fadeUp 0.2s ease forwards;
-}
+.card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; }
+.card-name { font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; }
+.card-phone { font-family: var(--mono); font-size: 0.75rem; color: var(--text-2); margin-top: 0.2rem; }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.card-name {
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
-
-.card-phone {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--text-2);
-  margin-top: 0.2rem;
-}
-
-.status-badge {
-  font-size: 0.72rem;
-  font-weight: 500;
-  padding: 0.2rem 0.6rem;
-  border-radius: 99px;
-  border: 1px solid transparent;
-  flex-shrink: 0;
-}
-
-.status-badge.connected  { background: var(--accent-dim); color: var(--accent); border-color: rgba(34,197,94,0.25); }
+.status-badge { font-size: 0.72rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 99px; border: 1px solid transparent; flex-shrink: 0; }
+.status-badge.connected   { background: var(--accent-dim); color: var(--accent); border-color: rgba(34,197,94,0.25); }
 .status-badge.connecting,
-.status-badge.qr         { background: var(--yellow-dim); color: var(--yellow); border-color: rgba(245,158,11,0.25); }
+.status-badge.qr          { background: var(--yellow-dim); color: var(--yellow); border-color: rgba(245,158,11,0.25); }
 .status-badge.logged_out,
 .status-badge.disconnected { background: var(--red-dim); color: var(--red); border-color: rgba(239,68,68,0.25); }
 
-.card-meta {
-  font-size: 0.78rem;
-  color: var(--text-2);
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
-}
-
+.card-meta { font-size: 0.78rem; color: var(--text-2); margin-bottom: 1rem; }
 .card-meta span { color: var(--text); font-family: var(--mono); font-size: 0.75rem; }
+.card-footer { display: flex; align-items: center; justify-content: flex-end; }
 
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.qr-wrap {
-  margin: 0.75rem 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: var(--surface-2);
-  border-radius: var(--radius);
-}
-
-.qr-label {
-  font-size: 0.75rem;
-  color: var(--yellow);
-  font-weight: 500;
-}
-
-.qr-wrap img {
-  width: 160px;
-  height: 160px;
-  border-radius: 4px;
-  background: #fff;
-  padding: 4px;
-}
-
+.qr-wrap { margin: 0.75rem 0; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1rem; background: var(--surface-2); border-radius: var(--radius); }
+.qr-label { font-size: 0.75rem; color: var(--yellow); font-weight: 500; }
+.qr-wrap img { width: 160px; height: 160px; border-radius: 4px; background: #fff; padding: 4px; }
 .qr-hint { font-size: 0.7rem; color: var(--text-3); }
 
-.empty-state {
-  grid-column: 1/-1;
-  text-align: center;
-  padding: 4rem 1rem;
-  color: var(--text-3);
-}
-
+.empty-state { grid-column: 1/-1; text-align: center; padding: 4rem 1rem; color: var(--text-3); }
 .empty-state-icon { font-size: 2rem; margin-bottom: 0.75rem; }
 .empty-state p { font-size: 0.875rem; }
 
-/* ── Instance detail ─────────────────────────────────── */
-.detail-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
+/* ── Instance detail ── */
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 700px) { .detail-grid { grid-template-columns: 1fr; } }
 
-@media (max-width: 700px) {
-  .detail-grid { grid-template-columns: 1fr; }
-}
+.detail-card { background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius); padding: 1.25rem; }
+.detail-card-title { font-size: 0.78rem; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; }
 
-.detail-card {
-  background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-}
-
-.detail-card-title {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 1rem;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.45rem 0;
-  border-bottom: 1px solid var(--border-2);
-  font-size: 0.825rem;
-}
-
+.info-row { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid var(--border-2); font-size: 0.825rem; }
 .info-row:last-child { border-bottom: none; }
 .info-row-label { color: var(--text-2); }
 .info-row-value { font-family: var(--mono); font-size: 0.78rem; color: var(--text); }
 
-.detail-qr {
-  grid-column: 1 / -1;
-}
-
-/* Webhooks in detail */
 .webhook-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
-
-.webhook-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--surface-2);
-  border-radius: 6px;
-  border: 1px solid var(--border-2);
-}
-
-.webhook-row-url {
-  flex: 1;
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.webhook-row-events {
-  display: flex;
-  gap: 0.3rem;
-  flex-shrink: 0;
-}
-
-.event-tag {
-  font-size: 0.68rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 99px;
-  background: var(--accent-dim);
-  color: var(--accent);
-  white-space: nowrap;
-}
-
-.webhook-row-del {
-  background: none;
-  border: none;
-  color: var(--text-3);
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  transition: all 0.1s;
-  flex-shrink: 0;
-}
-
+.webhook-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: var(--surface-2); border-radius: 6px; border: 1px solid var(--border-2); }
+.webhook-row-url { flex: 1; font-family: var(--mono); font-size: 0.75rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.webhook-row-events { display: flex; gap: 0.3rem; flex-shrink: 0; }
+.event-tag { font-size: 0.68rem; padding: 0.15rem 0.5rem; border-radius: 99px; background: var(--accent-dim); color: var(--accent); white-space: nowrap; }
+.webhook-row-del { background: none; border: none; color: var(--text-3); cursor: pointer; padding: 0.25rem; border-radius: 4px; display: flex; align-items: center; transition: all 0.1s; flex-shrink: 0; }
 .webhook-row-del:hover { background: var(--red-dim); color: var(--red); }
+.webhook-empty { padding: 1.5rem; text-align: center; color: var(--text-3); font-size: 0.825rem; background: var(--surface-2); border-radius: 6px; margin-bottom: 1rem; }
 
-.webhook-empty {
-  padding: 1.5rem;
-  text-align: center;
-  color: var(--text-3);
-  font-size: 0.825rem;
-  background: var(--surface-2);
-  border-radius: 6px;
-  margin-bottom: 1rem;
-}
-
-/* ── Logs table ──────────────────────────────────────── */
-.table-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
+/* ── Logs table ── */
+.table-wrap { background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius); overflow: hidden; }
 table { width: 100%; border-collapse: collapse; font-size: 0.825rem; }
-
 thead tr { border-bottom: 1px solid var(--border-2); }
-
-th {
-  text-align: left;
-  padding: 0.65rem 1rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-
-td {
-  padding: 0.6rem 1rem;
-  color: var(--text-2);
-  border-bottom: 1px solid var(--border-2);
-  white-space: nowrap;
-}
-
+th { text-align: left; padding: 0.65rem 1rem; font-size: 0.75rem; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+td { padding: 0.6rem 1rem; color: var(--text-2); border-bottom: 1px solid var(--border-2); white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: var(--surface-2); }
-
 .td-instance { color: var(--text); font-weight: 500; }
 .td-ok  { color: var(--accent); }
 .td-err { color: var(--red); }
@@ -555,137 +218,35 @@ tr:hover td { background: var(--surface-2); }
 .td-type.image    { color: var(--yellow); }
 .td-type.document { color: #34d399; }
 .td-mono { font-family: var(--mono); font-size: 0.75rem; }
-
 .no-rows { text-align: center; padding: 2.5rem; color: var(--text-3); font-size: 0.825rem; }
 
-/* ── Modals ──────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  backdrop-filter: blur(2px);
-}
-
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.75rem;
-  width: 100%;
-  max-width: 420px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-
-.modal-title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 1.25rem;
-  letter-spacing: -0.01em;
-}
-
-.modal label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text-2);
-  margin-bottom: 0.35rem;
-}
-
-.modal-input {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 0.875rem;
-  padding: 0.6rem 0.85rem;
-  outline: none;
-  margin-bottom: 1rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.modal-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-dim);
-}
-
-.checks-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.check-item {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.825rem;
-  color: var(--text);
-  cursor: pointer;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid var(--border-2);
-  transition: all 0.1s;
-}
-
+/* ── Modals ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; backdrop-filter: blur(2px); }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; letter-spacing: -0.01em; }
+.modal label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-2); margin-bottom: 0.35rem; }
+.modal-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--mono); font-size: 0.875rem; padding: 0.6rem 0.85rem; outline: none; margin-bottom: 1rem; transition: border-color 0.15s, box-shadow 0.15s; }
+.modal-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.checks-group { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+.check-item { display: flex; align-items: center; gap: 0.6rem; font-size: 0.825rem; color: var(--text); cursor: pointer; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-2); transition: all 0.1s; }
 .check-item:hover { background: var(--surface-2); border-color: var(--border); }
-
-.check-item input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
+.check-item input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
 .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
 
-/* ── Toast ───────────────────────────────────────────── */
-#toast {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  font-size: 0.825rem;
-  padding: 0.65rem 1rem;
-  border-radius: var(--radius);
-  border: 1px solid;
-  background: var(--surface);
-  z-index: 9000;
-  max-width: 300px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  animation: slideIn 0.2s ease;
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
+/* ── Toast ── */
+#toast { position: fixed; bottom: 1.5rem; right: 1.5rem; font-size: 0.825rem; padding: 0.65rem 1rem; border-radius: var(--radius); border: 1px solid; background: var(--surface); z-index: 9000; max-width: 300px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); animation: slideIn 0.2s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 #toast.ok   { color: var(--accent); border-color: rgba(34,197,94,0.3); }
 #toast.err  { color: var(--red);    border-color: rgba(239,68,68,0.3); }
 #toast.info { color: var(--yellow); border-color: rgba(245,158,11,0.3); }
 #toast.hidden { display: none; }
 
 .hidden { display: none !important; }
+.action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-/* ── Scrollbar ───────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border); }
-
-/* ── Detail action bar ───────────────────────────────── */
-.action-bar {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
 </style>
 </head>
 <body>
@@ -694,34 +255,37 @@ tr:hover td { background: var(--surface-2); }
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo"><span>W</span>ame</div>
-    <div class="login-sub">Panel de administración</div>
-    <label class="field-label">API Key</label>
-    <input class="field-input" type="password" id="login-input" placeholder="••••••••••••" autocomplete="off">
+    <div class="login-sub" data-i18n="login.subtitle">Admin panel</div>
+    <label class="field-label" data-i18n="login.api_key">API Key</label>
+    <input class="field-input" type="password" id="login-input" data-i18n-ph="login.api_key" placeholder="API Key" autocomplete="off">
     <div class="login-error" id="login-error"></div>
-    <button class="btn btn-primary btn-full" id="login-btn">Ingresar</button>
+    <button class="btn btn-primary btn-full" id="login-btn" data-i18n="login.btn">Sign in</button>
   </div>
 </div>
 
 <!-- ── App ── -->
 <div id="app" class="hidden">
 
-  <!-- Sidebar -->
   <aside id="sidebar">
     <div class="sidebar-logo"><span>W</span>ame</div>
     <nav class="sidebar-nav">
       <button class="nav-item active" data-view="instances">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        Instancias
+        <span data-i18n="nav.instances">Instances</span>
       </button>
       <button class="nav-item" data-view="logs">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Logs
+        <span data-i18n="nav.logs">Logs</span>
       </button>
     </nav>
     <div class="sidebar-footer">
+      <div class="lang-toggle">
+        <button class="lang-btn active" data-lang="en">EN</button>
+        <button class="lang-btn" data-lang="es">ES</button>
+      </div>
       <div class="user-row">
         <span class="user-dot"></span>
-        <span class="user-label">Autenticado</span>
+        <span class="user-label" data-i18n="sidebar.authenticated">Authenticated</span>
         <button class="btn btn-ghost" style="padding:0.3rem 0.5rem;font-size:0.75rem" id="btn-logout">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
@@ -729,36 +293,35 @@ tr:hover td { background: var(--surface-2); }
     </div>
   </aside>
 
-  <!-- Main -->
   <div id="main">
 
-    <!-- View: Instancias -->
+    <!-- Instances -->
     <div id="view-instances" class="view active">
       <div class="page-header">
-        <div class="page-title">Instancias</div>
+        <div class="page-title" data-i18n="instances.title">Instances</div>
         <button class="btn btn-primary" id="btn-new-instance">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nueva instancia
+          <span data-i18n="instances.new">New instance</span>
         </button>
       </div>
       <div class="page-content">
         <div id="instances-grid">
           <div class="empty-state">
             <div class="empty-state-icon">📱</div>
-            <p>No hay instancias activas</p>
+            <p data-i18n="instances.empty">No active instances — create a new one</p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- View: Detalle de instancia -->
+    <!-- Detail -->
     <div id="view-detail" class="view">
       <div class="page-header">
         <div class="page-header-left">
           <button class="btn btn-ghost" id="btn-back" style="padding:0.4rem 0.6rem">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <div class="page-title" id="detail-title">Instancia</div>
+          <div class="page-title" id="detail-title"></div>
           <div id="detail-badge"></div>
         </div>
         <div class="action-bar" id="detail-actions"></div>
@@ -766,13 +329,13 @@ tr:hover td { background: var(--surface-2); }
       <div class="page-content" id="detail-content"></div>
     </div>
 
-    <!-- View: Logs -->
+    <!-- Logs -->
     <div id="view-logs" class="view">
       <div class="page-header">
-        <div class="page-title">Logs de mensajes</div>
+        <div class="page-title" data-i18n="logs.title">Message logs</div>
         <button class="btn btn-secondary" id="btn-refresh-logs">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          Actualizar
+          <span data-i18n="btn.refresh">Refresh</span>
         </button>
       </div>
       <div class="page-content">
@@ -780,81 +343,84 @@ tr:hover td { background: var(--surface-2); }
           <table>
             <thead>
               <tr>
-                <th>Instancia</th>
-                <th>Destino</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Fecha</th>
+                <th data-i18n="logs.col.instance">Instance</th>
+                <th data-i18n="logs.col.destination">Destination</th>
+                <th data-i18n="logs.col.type">Type</th>
+                <th data-i18n="logs.col.status">Status</th>
+                <th data-i18n="logs.col.date">Date</th>
               </tr>
             </thead>
             <tbody id="logs-body">
-              <tr><td colspan="5" class="no-rows">Sin registros</td></tr>
+              <tr><td colspan="5" class="no-rows" data-i18n="logs.empty">No records yet</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-  </div><!-- /main -->
-</div><!-- /app -->
+  </div>
+</div>
 
-<!-- Modal: nueva instancia -->
+<!-- Modal: new instance -->
 <div class="modal-overlay hidden" id="modal-new">
   <div class="modal">
-    <div class="modal-title">Nueva instancia</div>
-    <label>Nombre</label>
+    <div class="modal-title" data-i18n="modal.new.title">New instance</div>
+    <label data-i18n="modal.new.name">Name</label>
     <input class="modal-input" type="text" id="new-name-input"
-           placeholder="ej: ventas, soporte, principal"
+           data-i18n-ph="modal.new.placeholder"
+           placeholder="e.g. sales, support, main"
            autocomplete="off" spellcheck="false">
     <div class="modal-actions">
-      <button class="btn btn-secondary" id="btn-modal-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="btn-modal-create">Conectar</button>
+      <button class="btn btn-secondary" id="btn-modal-cancel" data-i18n="btn.cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-modal-create" data-i18n="modal.new.connect">Connect</button>
     </div>
   </div>
 </div>
 
-<!-- Modal: agregar webhook -->
+<!-- Modal: webhook -->
 <div class="modal-overlay hidden" id="modal-webhook">
   <div class="modal">
-    <div class="modal-title">Agregar webhook</div>
+    <div class="modal-title" data-i18n="modal.wh.title">Add webhook</div>
     <input type="hidden" id="webhook-instance">
-    <label>URL del endpoint</label>
+    <label data-i18n="modal.wh.url">Endpoint URL</label>
     <input class="modal-input" type="url" id="webhook-url-input"
-           placeholder="https://tu-servidor.com/webhook"
+           data-i18n-ph="modal.wh.url.ph"
+           placeholder="https://your-server.com/webhook"
            autocomplete="off">
-    <label style="margin-bottom:0.6rem">Eventos</label>
+    <label style="margin-bottom:0.6rem" data-i18n="modal.wh.events">Events</label>
     <div class="checks-group">
       <label class="check-item">
         <input type="checkbox" value="messages" checked>
         <div>
-          <div style="font-weight:500">Mensajes</div>
-          <div style="font-size:0.75rem;color:var(--text-2)">Texto, imágenes, audio, documentos</div>
+          <div style="font-weight:500" data-i18n="modal.wh.msg">Messages</div>
+          <div style="font-size:0.75rem;color:var(--text-2)" data-i18n="modal.wh.msg.desc">Text, images, audio, documents</div>
         </div>
       </label>
       <label class="check-item">
         <input type="checkbox" value="group.join">
         <div>
-          <div style="font-weight:500">Entrada a grupo</div>
-          <div style="font-size:0.75rem;color:var(--text-2)">Alguien se une a un grupo</div>
+          <div style="font-weight:500" data-i18n="modal.wh.join">Group join</div>
+          <div style="font-size:0.75rem;color:var(--text-2)" data-i18n="modal.wh.join.desc">Someone joins a group</div>
         </div>
       </label>
       <label class="check-item">
         <input type="checkbox" value="group.leave">
         <div>
-          <div style="font-weight:500">Salida de grupo</div>
-          <div style="font-size:0.75rem;color:var(--text-2)">Alguien sale de un grupo</div>
+          <div style="font-weight:500" data-i18n="modal.wh.leave">Group leave</div>
+          <div style="font-size:0.75rem;color:var(--text-2)" data-i18n="modal.wh.leave.desc">Someone leaves a group</div>
         </div>
       </label>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-secondary" id="btn-hook-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="btn-hook-create">Guardar</button>
+      <button class="btn btn-secondary" id="btn-hook-cancel" data-i18n="btn.cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-hook-create" data-i18n="modal.wh.save">Save</button>
     </div>
   </div>
 </div>
 
 <div id="toast" class="hidden"></div>
 
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
