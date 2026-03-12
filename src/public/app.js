@@ -2,6 +2,7 @@
 let _apiKey = null;
 let pollTimer = null;
 let qrStore = {};
+let webhookStore = {}; // name → [ { id, url, events } ]
 const existingCards = new Set();
 
 // ── Login ──────────────────────────────────────────────────────
@@ -63,6 +64,7 @@ function doLogout() {
   stopPolling();
   existingCards.clear();
   qrStore = {};
+  webhookStore = {};
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-input').value = '';
@@ -104,6 +106,7 @@ async function poll() {
   try {
     const data = await api('GET', '/status');
     updateInstances(data.instances || []);
+    fetchAllWebhooks(data.instances || []);
     fetchLogs();
   } catch (_) {}
 }
@@ -173,6 +176,9 @@ function updateCard(el, inst) {
     existingQr.remove();
   }
 
+  const hooksEl = el.querySelector('.webhooks-section');
+  if (hooksEl) hooksEl.innerHTML = buildWebhooksHTML(inst.name);
+
   const actions = el.querySelector('.card-actions');
   if (actions) actions.innerHTML = buildActions(inst);
 }
@@ -185,6 +191,7 @@ function buildCardHTML(inst, isNew) {
     '</div><span class="badge ' + inst.status + '">' + statusLabel(inst.status) + '</span></div>' +
     (inst.status === 'qr' && qrStore[inst.name] ? buildQrHTML(inst.name) : '') +
     '<div class="card-meta">' + buildMeta(inst) + '</div>' +
+    '<div class="webhooks-section" id="hooks-' + inst.name + '">' + buildWebhooksHTML(inst.name) + '</div>' +
     '<div class="card-actions">' + buildActions(inst) + '</div></div>';
 }
 
@@ -210,6 +217,83 @@ function buildActions(inst) {
   }
   return '<button class="btn btn-warn" data-action="reconnect" data-name="' + escHtml(inst.name) + '">RECONECTAR</button>' +
          '<button class="btn btn-danger" data-action="disconnect" data-name="' + escHtml(inst.name) + '">ELIMINAR</button>';
+}
+
+// ── Webhooks ────────────────────────────────────────────────────
+function buildWebhooksHTML(name) {
+  const hooks = webhookStore[name] || [];
+  let html = '<div class="webhooks-title">WEBHOOKS <button class="btn btn-primary btn-add-hook" data-action="add-hook" data-name="' + escHtml(name) + '">+ AGREGAR</button></div>';
+  if (!hooks.length) {
+    html += '<div class="webhook-empty">sin webhooks configurados</div>';
+  } else {
+    for (const h of hooks) {
+      const shortUrl = h.url.length > 40 ? h.url.slice(0, 38) + '…' : h.url;
+      html += '<div class="webhook-item">' +
+        '<span class="webhook-url" title="' + escHtml(h.url) + '">' + escHtml(shortUrl) + '</span>' +
+        '<span class="webhook-events">' + h.events.join(', ') + '</span>' +
+        '<button class="webhook-del" data-action="del-hook" data-name="' + escHtml(name) + '" data-hook-id="' + h.id + '">X</button>' +
+        '</div>';
+    }
+  }
+  return html;
+}
+
+async function fetchWebhooks(name) {
+  try {
+    const data = await api('GET', '/instances/' + name + '/webhooks');
+    webhookStore[name] = data.webhooks || [];
+  } catch (_) {
+    webhookStore[name] = [];
+  }
+}
+
+async function fetchAllWebhooks(instances) {
+  for (const inst of instances) {
+    if (inst.status === 'connected' && !webhookStore[inst.name]) {
+      fetchWebhooks(inst.name);
+    }
+  }
+}
+
+function openWebhookModal(name) {
+  document.getElementById('webhook-instance').value = name;
+  document.getElementById('webhook-url-input').value = '';
+  document.querySelectorAll('#webhook-modal .modal-checks input').forEach(cb => { cb.checked = cb.value === 'messages'; });
+  document.getElementById('webhook-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('webhook-url-input').focus(), 50);
+}
+
+function closeWebhookModal() {
+  document.getElementById('webhook-modal').classList.add('hidden');
+}
+
+async function createWebhook() {
+  const name = document.getElementById('webhook-instance').value;
+  const url = document.getElementById('webhook-url-input').value.trim();
+  const events = Array.from(document.querySelectorAll('#webhook-modal .modal-checks input:checked')).map(cb => cb.value);
+
+  if (!url) { toast('err', 'Ingresa la URL del webhook'); return; }
+  if (!events.length) { toast('err', 'Selecciona al menos un evento'); return; }
+
+  closeWebhookModal();
+  try {
+    await api('POST', '/instances/' + name + '/webhooks', { url, events });
+    toast('ok', 'Webhook agregado');
+    await fetchWebhooks(name);
+    const hooksEl = document.getElementById('hooks-' + name);
+    if (hooksEl) hooksEl.innerHTML = buildWebhooksHTML(name);
+  } catch (e) { toast('err', 'Error: ' + e.message); }
+}
+
+async function deleteWebhook(name, hookId) {
+  if (!confirm('¿Eliminar este webhook?')) return;
+  try {
+    await api('DELETE', '/instances/' + name + '/webhooks/' + hookId);
+    toast('ok', 'Webhook eliminado');
+    await fetchWebhooks(name);
+    const hooksEl = document.getElementById('hooks-' + name);
+    if (hooksEl) hooksEl.innerHTML = buildWebhooksHTML(name);
+  } catch (e) { toast('err', 'Error: ' + e.message); }
 }
 
 // ── Acciones ───────────────────────────────────────────────────
@@ -323,6 +407,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') createInstance();
   });
 
+  // Webhook modal
+  document.getElementById('webhook-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('webhook-modal')) closeWebhookModal();
+  });
+  document.querySelector('[data-id="btn-hook-cancel"]').addEventListener('click', closeWebhookModal);
+  document.querySelector('[data-id="btn-hook-create"]').addEventListener('click', createWebhook);
+  document.getElementById('webhook-url-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') createWebhook();
+  });
+
   // Delegated click handler for dynamic instance buttons
   document.getElementById('instances-grid').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
@@ -331,5 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = btn.dataset.name;
     if (action === 'reconnect') reconnectInstance(name);
     else if (action === 'disconnect') disconnectInstance(name);
+    else if (action === 'add-hook') openWebhookModal(name);
+    else if (action === 'del-hook') deleteWebhook(name, btn.dataset.hookId);
   });
 });

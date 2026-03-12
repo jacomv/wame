@@ -9,6 +9,7 @@ import { mkdir } from 'fs/promises';
 import path from 'path';
 import pino from 'pino';
 import QRCode from 'qrcode';
+import { dispatch } from './webhooks.js';
 
 const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
 const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
@@ -90,6 +91,43 @@ export async function connectInstance(name) {
       } else {
         instances.set(name, { sock: null, status: 'logged_out', qr: null, phone: null, connectedAt: null });
       }
+    }
+  });
+
+  // ── Webhook: mensajes entrantes ──────────────────────────────
+  sock.ev.on('messages.upsert', ({ messages, type: upsertType }) => {
+    if (upsertType !== 'notify') return; // Solo mensajes nuevos, no historial
+    for (const msg of messages) {
+      if (msg.key.fromMe) continue; // Ignorar mensajes propios
+      const from = msg.key.remoteJid;
+      const pushName = msg.pushName || null;
+      const text = msg.message?.conversation
+        || msg.message?.extendedTextMessage?.text
+        || null;
+      const msgType = text ? 'text'
+        : msg.message?.imageMessage ? 'image'
+        : msg.message?.audioMessage ? 'audio'
+        : msg.message?.documentMessage ? 'document'
+        : msg.message?.videoMessage ? 'video'
+        : 'other';
+
+      dispatch(name, 'messages', {
+        from,
+        pushName,
+        type: msgType,
+        text,
+        messageId: msg.key.id,
+        isGroup: from?.endsWith('@g.us') || false,
+      });
+    }
+  });
+
+  // ── Webhook: cambios de participantes en grupos ────────────
+  sock.ev.on('group-participants.update', ({ id, participants, action }) => {
+    if (action === 'add') {
+      dispatch(name, 'group.join', { groupId: id, participants });
+    } else if (action === 'remove') {
+      dispatch(name, 'group.leave', { groupId: id, participants });
     }
   });
 
