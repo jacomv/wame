@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireApiKey } from '../auth.js';
 import { validateInstanceName } from '../utils/jid.js';
-import { addWebhook, listWebhooks, removeWebhook, VALID_EVENTS } from '../webhooks.js';
+import { addWebhook, listWebhooks, removeWebhook, updateWebhook, VALID_EVENTS } from '../webhooks.js';
 
 const router = Router();
 
@@ -22,6 +22,17 @@ router.get('/:name/webhooks', requireApiKey, validateInstanceName, async (req, r
     res.json({ webhooks: hooks, availableEvents: [...VALID_EVENTS] });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Actualizar webhook ──────────────────────────────────────────
+router.put('/:name/webhooks/:id', requireApiKey, validateInstanceName, async (req, res) => {
+  try {
+    const hook = await updateWebhook(req.params.name, req.params.id, req.body);
+    if (!hook) return res.status(404).json({ error: 'Webhook no encontrado' });
+    res.json(hook);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

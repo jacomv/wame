@@ -52,6 +52,7 @@ const TRANSLATIONS = {
 
     // Webhook modal
     'modal.wh.title':          'Add webhook',
+    'modal.wh.title.edit':     'Edit webhook',
     'modal.wh.url':            'Endpoint URL',
     'modal.wh.url.ph':         'https://your-server.com/webhook',
     'modal.wh.events':         'Events',
@@ -79,6 +80,7 @@ const TRANSLATIONS = {
 
     // Toasts
     'toast.webhook.added':     'Webhook added',
+    'toast.webhook.updated':   'Webhook updated',
     'toast.webhook.deleted':   'Webhook deleted',
     'toast.instance.deleted':  'Instance deleted',
     'toast.session.expired':   'Session expired',
@@ -139,6 +141,7 @@ const TRANSLATIONS = {
     'modal.new.connect':       'Conectar',
 
     'modal.wh.title':          'Agregar webhook',
+    'modal.wh.title.edit':     'Editar webhook',
     'modal.wh.url':            'URL del endpoint',
     'modal.wh.url.ph':         'https://tu-servidor.com/webhook',
     'modal.wh.events':         'Eventos',
@@ -163,6 +166,7 @@ const TRANSLATIONS = {
     'logs.empty':              'Sin registros aún',
 
     'toast.webhook.added':     'Webhook agregado',
+    'toast.webhook.updated':   'Webhook actualizado',
     'toast.webhook.deleted':   'Webhook eliminado',
     'toast.instance.deleted':  'Instancia eliminada',
     'toast.session.expired':   'Sesión expirada',

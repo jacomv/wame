@@ -62,6 +62,21 @@ export async function removeWebhook(instance, id) {
   return true;
 }
 
+export async function updateWebhook(instance, id, { url, events }) {
+  if (!url || typeof url !== 'string') throw new Error('Campo "url" requerido');
+  try { new URL(url); } catch { throw new Error('URL inválida'); }
+  if (!Array.isArray(events) || !events.length) throw new Error('Campo "events" requerido (array)');
+  const invalid = events.filter(e => !VALID_EVENTS.has(e));
+  if (invalid.length) throw new Error(`Eventos inválidos: ${invalid.join(', ')}. Válidos: ${[...VALID_EVENTS].join(', ')}`);
+
+  const hooks = await load(instance);
+  const idx = hooks.findIndex(h => h.id === id);
+  if (idx === -1) return null;
+  hooks[idx] = { ...hooks[idx], url, events };
+  await save(instance);
+  return hooks[idx];
+}
+
 // ── Dispatch (fire-and-forget) ──────────────────────────────────
 export async function dispatch(instance, event, data) {
   const hooks = await load(instance);
