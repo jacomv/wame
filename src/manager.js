@@ -22,6 +22,25 @@ const reconnecting = new Set();
 // Map de timers de reconexión pendientes para poder cancelarlos
 const reconnectTimers = new Map();
 
+// Resuelve un JID a número de teléfono.
+// @s.whatsapp.net → extrae el número directamente.
+// @lid → busca en el caché de contactos de Baileys el JID de teléfono asociado.
+// Retorna null si no se puede resolver (contacto no sincronizado aún).
+function resolvePhone(sock, jid) {
+  if (jid.endsWith('@s.whatsapp.net')) {
+    return jid.split('@')[0].split(':')[0];
+  }
+  if (jid.endsWith('@lid')) {
+    const contacts = sock.contacts || {};
+    for (const contact of Object.values(contacts)) {
+      if (contact.lid === jid) {
+        return contact.id?.split('@')[0]?.split(':')[0] ?? null;
+      }
+    }
+  }
+  return null;
+}
+
 export async function connectInstance(name) {
   // Si ya está conectada, no hacer nada
   if (instances.has(name)) {
@@ -126,10 +145,14 @@ export async function connectInstance(name) {
 
   // ── Webhook: cambios de participantes en grupos ────────────
   sock.ev.on('group-participants.update', ({ id, participants, action }) => {
+    const resolved = participants.map(jid => ({
+      jid,
+      phone: resolvePhone(sock, jid),
+    }));
     if (action === 'add') {
-      dispatch(name, 'group.join', { groupId: id, participants });
+      dispatch(name, 'group.join', { groupId: id, participants: resolved });
     } else if (action === 'remove') {
-      dispatch(name, 'group.leave', { groupId: id, participants });
+      dispatch(name, 'group.leave', { groupId: id, participants: resolved });
     }
   });
 
