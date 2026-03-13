@@ -46,7 +46,7 @@ export async function connectInstance(name) {
     },
     logger,
     printQRInTerminal: false,
-    browser: ['WhatsApp Sender', 'Chrome', '1.0.0'],
+    browser: ['Chrome (Linux)', '', ''],
     generateHighQualityLinkPreview: true,
   });
 
