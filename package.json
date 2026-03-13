@@ -1,13 +1,25 @@
 {
-  "name": "whatsapp-sender",
+  "name": "wame",
   "version": "1.0.0",
-  "description": "Microservicio minimalista de envío unidireccional de WhatsApp",
+  "description": "Minimal WhatsApp REST API — send messages and receive webhooks. No external services required.",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/*.test.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jacobisaldana/wame.git"
+  },
+  "homepage": "https://github.com/Jacobisaldana/wame#readme",
+  "bugs": {
+    "url": "https://github.com/Jacobisaldana/wame/issues"
+  },
+  "license": "MIT",
+  "author": "Jacobis A. <hola@masvirtual.co>",
+  "keywords": ["whatsapp", "baileys", "webhook", "rest-api", "nodejs", "docker"],
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.16",
     "better-sqlite3": "^12.6.2",

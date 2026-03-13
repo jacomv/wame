@@ -22,7 +22,7 @@ async function load(instance) {
     store.set(instance, hooks);
     return hooks;
   } catch (err) {
-    if (err.code === 'ENOENT') { store.set(instance, []); return []; }
+    if (err.code === 'ENOENT') { const empty = []; store.set(instance, empty); return empty; }
     throw err;
   }
 }
