@@ -21,6 +21,8 @@ const instances = new Map();
 const reconnecting = new Set();
 // Map de timers de reconexión pendientes para poder cancelarlos
 const reconnectTimers = new Map();
+// Contador de reintentos para backoff exponencial
+const reconnectAttempts = new Map();
 
 export async function connectInstance(name) {
   // Si ya está conectada, no hacer nada
@@ -48,12 +50,20 @@ export async function connectInstance(name) {
     printQRInTerminal: false,
     browser: ['Chrome (Linux)', '', ''],
     generateHighQualityLinkPreview: true,
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
+    shouldIgnoreJid: (jid) => jid?.endsWith('@newsletter') || false,
   });
 
   // Entrada inicial en el mapa
   instances.set(name, { sock, status: 'connecting', qr: null, phone: null, connectedAt: null });
 
   sock.ev.on('creds.update', saveCreds);
+
+  // Descartar historial sincronizado para no saturar memoria
+  sock.ev.on('messaging-history.set', () => {
+    console.log(`[${name}] Historial recibido y descartado (no se almacena)`);
+  });
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -71,6 +81,7 @@ export async function connectInstance(name) {
       const phone = sock.user?.id?.split(':')[0] ?? null;
       instances.set(name, { ...inst, status: 'connected', qr: null, phone, connectedAt: new Date().toISOString() });
       reconnecting.delete(name);
+      reconnectAttempts.delete(name);
       console.log(`[${name}] Conectado como ${phone}`);
     }
 
@@ -82,11 +93,14 @@ export async function connectInstance(name) {
 
       if (shouldReconnect) {
         instances.delete(name);
-        // Guardar referencia al timer para poder cancelarlo
+        const attempts = (reconnectAttempts.get(name) ?? 0) + 1;
+        reconnectAttempts.set(name, attempts);
+        const delay = Math.min(attempts * 5000, 60_000); // 5s, 10s, 15s... máx 60s
+        console.log(`[${name}] Reintento #${attempts} en ${delay / 1000}s`);
         const timer = setTimeout(() => {
           reconnectTimers.delete(name);
           connectInstance(name);
-        }, 5000);
+        }, delay);
         reconnectTimers.set(name, timer);
       } else {
         instances.set(name, { sock: null, status: 'logged_out', qr: null, phone: null, connectedAt: null });
@@ -197,6 +211,7 @@ export async function disconnectInstance(name) {
 
   instances.delete(name);
   reconnecting.delete(name);
+  reconnectAttempts.delete(name);
 
   // Borrar archivos de sesión
   const { rm } = await import('fs/promises');
@@ -242,4 +257,5 @@ export async function shutdown() {
   }
   instances.clear();
   reconnecting.clear();
+  reconnectAttempts.clear();
 }
