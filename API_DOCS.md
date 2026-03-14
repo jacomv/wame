@@ -209,6 +209,84 @@ curl -X POST http://localhost:3000/instances/sales/send \
 
 ---
 
+### Check number
+
+```
+POST /instances/:name/check-number
+```
+
+Verify if a phone number is registered on WhatsApp before sending a message.
+
+**Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `number` | string | Yes | Phone number to check |
+
+**Response:**
+
+```json
+{
+  "exists": true,
+  "jid": "5491155551234@s.whatsapp.net"
+}
+```
+
+If the number is not on WhatsApp:
+
+```json
+{
+  "exists": false,
+  "jid": null
+}
+```
+
+---
+
+### Restart instance
+
+```
+POST /instances/:name/restart
+```
+
+Disconnects and reconnects the instance **without deleting the session**. Useful when the connection has issues or after updates.
+
+**Response:**
+
+```json
+{
+  "status": "connected"
+}
+```
+
+If the instance doesn't exist: **404** `{ "error": "Instancia no encontrada" }`
+
+---
+
+### Profile picture
+
+```
+GET /instances/:name/profile-picture?jid=5491155551234
+```
+
+Get the profile picture URL for a contact or group.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `jid` | string | Yes | Phone number or JID |
+
+**Response:**
+
+```json
+{
+  "url": "https://pps.whatsapp.net/v/t61.24694-24/..."
+}
+```
+
+If no profile picture: `{ "url": null }`
+
+---
+
 ### List groups
 
 ```

@@ -263,6 +263,31 @@ export async function restoreExistingSessions() {
   }
 }
 
+/** Reiniciar instancia: desconectar sin borrar sesión y reconectar */
+export async function restartInstance(name) {
+  const inst = instances.get(name);
+  if (!inst) return null;
+
+  // Cancelar reconexión pendiente si existe
+  const timer = reconnectTimers.get(name);
+  if (timer) {
+    clearTimeout(timer);
+    reconnectTimers.delete(name);
+  }
+
+  reconnecting.add(name); // bloquear reconexión automática
+  try {
+    if (inst.sock) inst.sock.end();
+  } catch (_) {}
+
+  instances.delete(name);
+  reconnecting.delete(name);
+  reconnectAttempts.delete(name);
+
+  // Reconectar con la sesión existente
+  return connectInstance(name);
+}
+
 /** Apagado limpio: desconectar todos los sockets */
 export async function shutdown() {
   // Cancelar todos los timers de reconexión

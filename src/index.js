@@ -50,6 +50,11 @@ app.get('/health', (_req, res) => {
 });
 
 // ── Rutas ───────────────────────────────────────────────────────
+app.get('/instances', requireApiKey, (_req, res) => {
+  res.json({ instances: getAllStatus() });
+});
+
+// Alias legacy
 app.get('/status', requireApiKey, (_req, res) => {
   res.json({ instances: getAllStatus() });
 });
