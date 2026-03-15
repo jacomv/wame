@@ -38,6 +38,7 @@ const TRANSLATIONS = {
     'detail.webhooks.empty':   'No webhooks configured',
     'detail.disconnect':       'Disconnect',
     'detail.reconnect':        'Reconnect',
+    'detail.restart':          'Restart',
     'detail.delete':           'Delete',
 
     // QR
@@ -130,6 +131,7 @@ const TRANSLATIONS = {
     'detail.webhooks.empty':   'Sin webhooks configurados',
     'detail.disconnect':       'Desconectar',
     'detail.reconnect':        'Reconectar',
+    'detail.restart':          'Reiniciar',
     'detail.delete':           'Eliminar',
 
     'qr.label':                'Escanea con WhatsApp',

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireApiKey } from '../auth.js';
 import { validateInstanceName, normalizeJid, validatePhoneOrJid } from '../utils/jid.js';
-import { connectInstance, getSocket, getInstanceStatus, disconnectInstance } from '../manager.js';
+import { connectInstance, getSocket, getInstanceStatus, disconnectInstance, restartInstance } from '../manager.js';
 import { sendMessage } from '../sender.js';
 import { logMessage } from '../logger.js';
 import { dispatch, listWebhooks } from '../webhooks.js';
@@ -98,6 +98,30 @@ router.get('/:name/groups/:groupId/participants', requireApiKey, validateInstanc
   }
 });
 
+// ── Verificar si un número está en WhatsApp ─────────────────────
+router.post('/:name/check-number', requireApiKey, validateInstanceName, async (req, res) => {
+  const { number } = req.body;
+  if (!number) return res.status(400).json({ error: 'Campo "number" requerido' });
+
+  if (!validatePhoneOrJid(number)) {
+    return res.status(400).json({ error: 'Formato de número inválido' });
+  }
+
+  const sock = getSocket(req.params.name);
+  if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
+
+  try {
+    const jid = normalizeJid(number);
+    const [result] = await sock.onWhatsApp(jid);
+    res.json({
+      exists: !!result?.exists,
+      jid: result?.jid ?? null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Test webhook: dispara payload de prueba y reporta resultado ─
 router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, async (req, res) => {
   const { name } = req.params;
@@ -127,6 +151,42 @@ router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, async (
     })
   );
   res.json({ results });
+});
+
+// ── Reiniciar instancia (sin borrar sesión) ─────────────────────
+router.post('/:name/restart', requireApiKey, validateInstanceName, async (req, res) => {
+  try {
+    const result = await restartInstance(req.params.name);
+    if (!result) return res.status(404).json({ error: 'Instancia no encontrada' });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Obtener foto de perfil ──────────────────────────────────────
+router.get('/:name/profile-picture', requireApiKey, validateInstanceName, async (req, res) => {
+  const { jid } = req.query;
+  if (!jid) return res.status(400).json({ error: 'Query param "jid" requerido' });
+
+  if (!validatePhoneOrJid(jid)) {
+    return res.status(400).json({ error: 'Formato de JID inválido' });
+  }
+
+  const sock = getSocket(req.params.name);
+  if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
+
+  try {
+    const normalizedJid = normalizeJid(jid);
+    const url = await sock.profilePictureUrl(normalizedJid, 'image');
+    res.json({ url });
+  } catch (err) {
+    // WhatsApp devuelve error si no hay foto de perfil
+    if (err.message?.includes('not-authorized') || err.message?.includes('item-not-found')) {
+      return res.json({ url: null });
+    }
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Desconectar / eliminar instancia ───────────────────────────
