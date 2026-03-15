@@ -221,7 +221,9 @@ function refreshDetailDynamic(name) {
 function renderDetailActions(inst) {
   const bar = document.getElementById('detail-actions');
   if (inst.status === 'connected') {
-    bar.innerHTML = `<button class="btn btn-danger" data-action="disconnect" data-name="${escHtml(inst.name)}">${t('detail.disconnect')}</button>`;
+    bar.innerHTML = `
+      <button class="btn btn-secondary" data-action="restart" data-name="${escHtml(inst.name)}">${t('detail.restart')}</button>
+      <button class="btn btn-danger" data-action="disconnect" data-name="${escHtml(inst.name)}">${t('detail.disconnect')}</button>`;
   } else {
     bar.innerHTML = `
       <button class="btn btn-secondary" data-action="reconnect" data-name="${escHtml(inst.name)}">${t('detail.reconnect')}</button>
@@ -352,6 +354,16 @@ async function reconnectInstance(name) {
     const data = await api('POST', `/instances/${name}/connect`);
     if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', t('toast.qr.ready')); }
     else toast('ok', `${name} ${t('val.already_connected')}`);
+    poll();
+  } catch (e) { toast('err', e.message); }
+}
+
+async function restartInstance(name) {
+  toast('info', `${name}…`);
+  try {
+    const data = await api('POST', `/instances/${name}/restart`);
+    if (data.status === 'qr') { qrStore[name] = data.qr; toast('info', t('toast.qr.ready')); }
+    else toast('ok', `${name} — restarted`);
     poll();
   } catch (e) { toast('err', e.message); }
 }
@@ -506,6 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const { action, name, hookId } = btn.dataset;
     if      (action === 'open-detail')  openDetail(name);
     else if (action === 'reconnect')    reconnectInstance(name);
+    else if (action === 'restart')      restartInstance(name);
     else if (action === 'disconnect')   disconnectInstance(name);
     else if (action === 'add-hook')     openWebhookModal(name);
     else if (action === 'edit-hook')    openWebhookModal(name, (webhookStore[name] || []).find(h => h.id === hookId));
