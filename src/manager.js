@@ -15,6 +15,23 @@ const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
 const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
 const logger = pino({ level: 'silent' });
 
+// Caché de mensajes enviados para reintentos de descifrado (getMessage)
+// Evita el error "Esperando el mensaje" en el receptor
+const MSG_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+const msgCache = new Map(); // key: `${instanceName}:${msgId}` → { message, timer }
+
+function cacheMessage(instanceName, msgId, message) {
+  const key = `${instanceName}:${msgId}`;
+  const existing = msgCache.get(key);
+  if (existing?.timer) clearTimeout(existing.timer);
+  const timer = setTimeout(() => msgCache.delete(key), MSG_CACHE_TTL);
+  msgCache.set(key, { message, timer });
+}
+
+function getCachedMessage(instanceName, msgId) {
+  return msgCache.get(`${instanceName}:${msgId}`)?.message ?? undefined;
+}
+
 // Map de instancias activas: name → { sock, status, qr, phone, connectedAt }
 const instances = new Map();
 // Set para evitar reconexiones simultáneas
@@ -72,6 +89,10 @@ export async function connectInstance(name) {
     syncFullHistory: false,
     markOnlineOnConnect: false,
     shouldIgnoreJid: (jid) => jid?.endsWith('@newsletter') || false,
+    getMessage: async (key) => {
+      const msg = getCachedMessage(name, key.id);
+      return msg;
+    },
   });
 
   // Entrada inicial en el mapa
@@ -131,7 +152,11 @@ export async function connectInstance(name) {
   sock.ev.on('messages.upsert', ({ messages, type: upsertType }) => {
     if (upsertType !== 'notify') return; // Solo mensajes nuevos, no historial
     for (const msg of messages) {
-      if (msg.key.fromMe) continue; // Ignorar mensajes propios
+      // Cachear todos los mensajes (propios incluidos) para getMessage retries
+      if (msg.key.id && msg.message) {
+        cacheMessage(name, msg.key.id, msg.message);
+      }
+      if (msg.key.fromMe) continue; // Ignorar mensajes propios para webhook
       const from = msg.key.remoteJid;
       const pushName = msg.pushName || null;
       const text = msg.message?.conversation
