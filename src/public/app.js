@@ -26,42 +26,86 @@ async function api(method, path, body) {
 }
 
 // ── Auth ────────────────────────────────────────────────────────
+let _activeTab = 'apikey';
+
+function switchTab(tab) {
+  _activeTab = tab;
+  document.querySelectorAll('.login-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.login-tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab)?.classList.add('active');
+  document.getElementById('login-error').textContent = '';
+
+  const btn = document.getElementById('login-btn');
+  if (tab === 'register') {
+    btn.textContent = t('login.btn.register');
+  } else {
+    btn.textContent = t('login.btn');
+  }
+}
+
+async function enterApp(apiKey) {
+  _apiKey = apiKey;
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  applyTranslations();
+  startPolling();
+}
+
 async function doLogin() {
-  const input = document.getElementById('login-input');
-  const btn   = document.getElementById('login-btn');
-  const err   = document.getElementById('login-error');
-  const key   = input.value.trim();
-
-  if (!key) { err.textContent = t('login.error.invalid'); return; }
-
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
   btn.disabled = true;
   err.textContent = '';
 
   try {
-    const res = await fetch('/status', { headers: { 'x-api-key': key } });
-    if (res.status === 401) {
-      err.textContent = t('login.error.invalid');
-      btn.disabled = false; input.focus(); return;
+    if (_activeTab === 'apikey') {
+      const key = document.getElementById('login-input').value.trim();
+      if (!key) { err.textContent = t('login.error.invalid'); btn.disabled = false; return; }
+
+      const res = await fetch('/status', { headers: { 'x-api-key': key } });
+      if (res.status === 401) { err.textContent = t('login.error.invalid'); btn.disabled = false; return; }
+      if (res.status === 429) { err.textContent = t('login.error.rate_limit'); btn.disabled = false; return; }
+      if (!res.ok) { err.textContent = t('login.error.server'); btn.disabled = false; return; }
+      document.getElementById('login-input').value = '';
+      await enterApp(key);
+
+    } else if (_activeTab === 'email') {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      if (!email || !password) { err.textContent = t('login.error.fields'); btn.disabled = false; return; }
+
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) { err.textContent = data.error; btn.disabled = false; return; }
+      document.getElementById('login-email').value = '';
+      document.getElementById('login-password').value = '';
+      await enterApp(data.apiKey);
+
+    } else if (_activeTab === 'register') {
+      const email = document.getElementById('reg-email').value.trim();
+      const password = document.getElementById('reg-password').value;
+      if (!email || !password) { err.textContent = t('login.error.fields'); btn.disabled = false; return; }
+      if (password.length < 6) { err.textContent = t('login.error.password_short'); btn.disabled = false; return; }
+
+      const res = await fetch('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) { err.textContent = data.error; btn.disabled = false; return; }
+      document.getElementById('reg-email').value = '';
+      document.getElementById('reg-password').value = '';
+      await enterApp(data.apiKey);
     }
-    if (res.status === 429) {
-      err.textContent = t('login.error.rate_limit');
-      btn.disabled = false; return;
-    }
-    if (!res.ok) {
-      err.textContent = t('login.error.server');
-      btn.disabled = false; return;
-    }
-    _apiKey = key;
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    input.value = '';
-    // Apply current language to app UI
-    applyTranslations();
-    startPolling();
   } catch (e) {
     err.textContent = t('login.error.connect') + e.message;
-    btn.disabled = false; input.focus();
   }
+  btn.disabled = false;
 }
 
 function doLogout() {
@@ -472,9 +516,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   overlay.addEventListener('click', closeSidebar);
 
+  // Login tabs
+  document.querySelectorAll('.login-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
   // Login
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('login-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('reg-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
   // Logout
   document.getElementById('btn-logout').addEventListener('click', doLogout);
