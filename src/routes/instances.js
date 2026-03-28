@@ -6,6 +6,7 @@ import { connectInstance, getSocket, getInstanceStatus, disconnectInstance, rest
 import { sendMessage } from '../sender.js';
 import { logMessage } from '../logger.js';
 import { dispatch, listWebhooks } from '../webhooks.js';
+import { assignInstance, getInstanceOwner, removeInstanceOwner } from '../accounts.js';
 
 const router = Router();
 
@@ -18,10 +19,34 @@ const sendLimiter = rateLimit({
   message: { error: 'Límite de envío alcanzado. Intenta más tarde.' },
 });
 
+/** Middleware: verifica que el usuario autenticado sea dueño de la instancia */
+function requireOwnership(req, res, next) {
+  if (req.isAdmin) return next(); // Admin tiene acceso a todo
+
+  const { name } = req.params;
+  const owner = getInstanceOwner(name);
+
+  // Si no tiene dueño, permitir (instancia huérfana o nueva)
+  if (owner === null) return next();
+
+  // Si el dueño es otro, denegar
+  if (owner !== req.account?.id) {
+    return res.status(403).json({ error: 'No tienes acceso a esta instancia' });
+  }
+
+  next();
+}
+
 // ── Conectar / reconectar instancia ────────────────────────────
-router.post('/:name/connect', requireApiKey, validateInstanceName, async (req, res) => {
+router.post('/:name/connect', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   try {
     const result = await connectInstance(req.params.name);
+
+    // Asignar ownership si es una cuenta registrada y la instancia no tiene dueño
+    if (req.account && !getInstanceOwner(req.params.name)) {
+      assignInstance(req.params.name, req.account.id);
+    }
+
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -29,14 +54,14 @@ router.post('/:name/connect', requireApiKey, validateInstanceName, async (req, r
 });
 
 // ── Estado de una instancia (incluye QR si está pendiente) ─────
-router.get('/:name/status', requireApiKey, validateInstanceName, (req, res) => {
+router.get('/:name/status', requireApiKey, validateInstanceName, requireOwnership, (req, res) => {
   const inst = getInstanceStatus(req.params.name);
   if (!inst) return res.status(404).json({ error: 'Instancia no encontrada' });
   res.json(inst);
 });
 
 // ── Enviar mensaje ──────────────────────────────────────────────
-router.post('/:name/send', requireApiKey, validateInstanceName, sendLimiter, async (req, res) => {
+router.post('/:name/send', requireApiKey, validateInstanceName, requireOwnership, sendLimiter, async (req, res) => {
   const { name } = req.params;
   const { to, type, ...payload } = req.body;
 
@@ -65,7 +90,7 @@ router.post('/:name/send', requireApiKey, validateInstanceName, sendLimiter, asy
 });
 
 // ── Listar grupos de una instancia ─────────────────────────────
-router.get('/:name/groups', requireApiKey, validateInstanceName, async (req, res) => {
+router.get('/:name/groups', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   const sock = getSocket(req.params.name);
   if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
   try {
@@ -82,7 +107,7 @@ router.get('/:name/groups', requireApiKey, validateInstanceName, async (req, res
 });
 
 // ── Participantes de un grupo ───────────────────────────────────
-router.get('/:name/groups/:groupId/participants', requireApiKey, validateInstanceName, async (req, res) => {
+router.get('/:name/groups/:groupId/participants', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   const sock = getSocket(req.params.name);
   if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
   try {
@@ -99,7 +124,7 @@ router.get('/:name/groups/:groupId/participants', requireApiKey, validateInstanc
 });
 
 // ── Verificar si un número está en WhatsApp ─────────────────────
-router.post('/:name/check-number', requireApiKey, validateInstanceName, async (req, res) => {
+router.post('/:name/check-number', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   const { number } = req.body;
   if (!number) return res.status(400).json({ error: 'Campo "number" requerido' });
 
@@ -123,7 +148,7 @@ router.post('/:name/check-number', requireApiKey, validateInstanceName, async (r
 });
 
 // ── Test webhook: dispara payload de prueba y reporta resultado ─
-router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, async (req, res) => {
+router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   const { name } = req.params;
   const hooks = await listWebhooks(name);
   if (!hooks.length) return res.status(404).json({ error: 'No hay webhooks registrados para esta instancia' });
@@ -154,7 +179,7 @@ router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, async (
 });
 
 // ── Reiniciar instancia (sin borrar sesión) ─────────────────────
-router.post('/:name/restart', requireApiKey, validateInstanceName, async (req, res) => {
+router.post('/:name/restart', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   try {
     const result = await restartInstance(req.params.name);
     if (!result) return res.status(404).json({ error: 'Instancia no encontrada' });
@@ -165,7 +190,7 @@ router.post('/:name/restart', requireApiKey, validateInstanceName, async (req, r
 });
 
 // ── Obtener foto de perfil ──────────────────────────────────────
-router.get('/:name/profile-picture', requireApiKey, validateInstanceName, async (req, res) => {
+router.get('/:name/profile-picture', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   const { jid } = req.query;
   if (!jid) return res.status(400).json({ error: 'Query param "jid" requerido' });
 
@@ -190,10 +215,11 @@ router.get('/:name/profile-picture', requireApiKey, validateInstanceName, async 
 });
 
 // ── Desconectar / eliminar instancia ───────────────────────────
-router.delete('/:name', requireApiKey, validateInstanceName, async (req, res) => {
+router.delete('/:name', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
   try {
     const ok = await disconnectInstance(req.params.name);
     if (!ok) return res.status(404).json({ error: 'Instancia no encontrada' });
+    removeInstanceOwner(req.params.name);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

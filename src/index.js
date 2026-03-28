@@ -7,7 +7,9 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { requireApiKey } from './auth.js';
 import { getAllStatus, restoreExistingSessions, shutdown } from './manager.js';
+import { getOwnedInstances } from './accounts.js';
 import { checkUpdates } from './updater.js';
+import authRoutes from './routes/auth.js';
 import instanceRoutes from './routes/instances.js';
 import webhookRoutes from './routes/webhooks.js';
 import logRoutes from './routes/logs.js';
@@ -49,14 +51,26 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
 
+// ── Auth routes (públicas) ──────────────────────────────────────
+app.use('/auth', authRoutes);
+
 // ── Rutas ───────────────────────────────────────────────────────
-app.get('/instances', requireApiKey, (_req, res) => {
-  res.json({ instances: getAllStatus() });
+app.get('/instances', requireApiKey, (req, res) => {
+  const all = getAllStatus();
+  if (req.isAdmin) return res.json({ instances: all });
+
+  // Filtrar por instancias propias
+  const owned = new Set(getOwnedInstances(req.account.id));
+  res.json({ instances: all.filter(i => owned.has(i.name)) });
 });
 
 // Alias legacy
-app.get('/status', requireApiKey, (_req, res) => {
-  res.json({ instances: getAllStatus() });
+app.get('/status', requireApiKey, (req, res) => {
+  const all = getAllStatus();
+  if (req.isAdmin) return res.json({ instances: all });
+
+  const owned = new Set(getOwnedInstances(req.account.id));
+  res.json({ instances: all.filter(i => owned.has(i.name)) });
 });
 app.use('/instances', instanceRoutes);
 app.use('/instances', webhookRoutes);

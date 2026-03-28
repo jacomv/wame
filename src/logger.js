@@ -1,24 +1,4 @@
-import Database from 'better-sqlite3';
-import { mkdirSync } from 'fs';
-
-const DATA_DIR = process.env.DATA_DIR || './data';
-mkdirSync(DATA_DIR, { recursive: true });
-
-const db = new Database(`${DATA_DIR}/wame.db`);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS message_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    instance TEXT NOT NULL,
-    "to" TEXT NOT NULL,
-    type TEXT NOT NULL,
-    status TEXT NOT NULL,
-    error TEXT,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-  );
-  CREATE INDEX IF NOT EXISTS idx_message_logs_instance ON message_logs(instance);
-  CREATE INDEX IF NOT EXISTS idx_message_logs_created_at ON message_logs(created_at);
-`);
+import db from './db.js';
 
 const stmtInsert = db.prepare(
   `INSERT INTO message_logs (instance, "to", type, status, error) VALUES (?, ?, ?, ?, ?)`
@@ -32,6 +12,14 @@ const stmtSelectByInstance = db.prepare(
   `SELECT * FROM message_logs WHERE instance = ? ORDER BY created_at DESC LIMIT ?`
 );
 
+const stmtSelectByInstances = (names) => {
+  if (!names.length) return [];
+  const placeholders = names.map(() => '?').join(',');
+  return db.prepare(
+    `SELECT * FROM message_logs WHERE instance IN (${placeholders}) ORDER BY created_at DESC LIMIT ?`
+  ).all(...names);
+};
+
 export function logMessage({ instance, to, type, status, error = null }) {
   try {
     stmtInsert.run(instance, to, type, status, error);
@@ -40,7 +28,15 @@ export function logMessage({ instance, to, type, status, error = null }) {
   }
 }
 
-export function getLogs({ instance, limit = 20 }) {
+export function getLogs({ instance, limit = 20, instanceNames = null }) {
+  // If filtering by owned instances
+  if (instanceNames) {
+    if (!instanceNames.length) return [];
+    const placeholders = instanceNames.map(() => '?').join(',');
+    return db.prepare(
+      `SELECT * FROM message_logs WHERE instance IN (${placeholders}) ORDER BY created_at DESC LIMIT ?`
+    ).all(...instanceNames, limit);
+  }
   if (instance) {
     return stmtSelectByInstance.all(instance, limit);
   }
