@@ -6,10 +6,33 @@ Complete guide for integrating any service with WAME.
 
 ## Authentication
 
-All requests (except `/health`) require the `x-api-key` header.
+WAME supports two authentication methods:
+
+### 1. Admin API key (global)
+
+Set `API_KEY` in `.env`. This key has full access to all instances.
 
 ```
-x-api-key: your-api-key
+x-api-key: your-admin-key
+```
+
+### 2. User accounts (multi-tenant)
+
+Register an account to get a unique API key. Each account only has access to its own instances.
+
+```bash
+# Register
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "mypassword"}'
+
+# Response: { "ok": true, "email": "user@example.com", "apiKey": "wame_a1b2c3..." }
+```
+
+Then use the returned key:
+
+```
+x-api-key: wame_a1b2c3...
 ```
 
 Invalid or missing key returns:
@@ -32,15 +55,85 @@ Invalid or missing key returns:
 └──────────────────┘     └──────────┘     └───────────┘
 ```
 
-1. Deploy WAME and set `API_KEY`.
-2. Connect an instance — `POST /instances/:name/connect`.
-3. Scan the returned QR with WhatsApp.
-4. Send messages — `POST /instances/:name/send`.
-5. Register a webhook to receive incoming events — `POST /instances/:name/webhooks`.
+1. Deploy WAME.
+2. Register an account (`POST /auth/register`) or use the admin `API_KEY`.
+3. Connect an instance — `POST /instances/:name/connect`.
+4. Scan the returned QR with WhatsApp.
+5. Send messages — `POST /instances/:name/send`.
+6. Register a webhook to receive incoming events — `POST /instances/:name/webhooks`.
 
 ---
 
 ## Endpoints
+
+### Register account
+
+```
+POST /auth/register
+```
+
+No authentication required. Creates a new account and returns a unique API key.
+
+**Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | Valid email address |
+| `password` | string | Yes | Minimum 6 characters |
+
+**Response `201`:**
+
+```json
+{
+  "ok": true,
+  "email": "user@example.com",
+  "apiKey": "wame_a1b2c3d4e5f6..."
+}
+```
+
+**Errors:**
+
+| Status | Cause |
+|--------|-------|
+| 400 | Missing/invalid email or password too short |
+| 409 | Email already registered |
+| 429 | Rate limit exceeded |
+
+---
+
+### Login
+
+```
+POST /auth/login
+```
+
+No authentication required. Returns the API key for an existing account.
+
+**Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | Registered email |
+| `password` | string | Yes | Account password |
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "email": "user@example.com",
+  "apiKey": "wame_a1b2c3d4e5f6..."
+}
+```
+
+**Errors:**
+
+| Status | Cause |
+|--------|-------|
+| 401 | Invalid credentials |
+| 429 | Rate limit exceeded |
+
+---
 
 ### Health check
 
@@ -61,6 +154,8 @@ No authentication required. For load balancers and Docker health checks.
 ```
 GET /status
 ```
+
+Returns instances owned by the authenticated account. Admin key sees all instances.
 
 **Response:**
 
@@ -478,7 +573,7 @@ Fires a test `messages` payload to all registered webhooks for the instance and 
 GET /logs
 ```
 
-Returns sent message history (stored in embedded SQLite).
+Returns sent message history (stored in embedded SQLite). Filtered by account ownership — each user only sees logs from their own instances. Admin key sees all logs.
 
 **Query params:**
 
@@ -592,8 +687,10 @@ Configure an HTTP node:
 | HTTP Status | Meaning | Action |
 |-------------|---------|--------|
 | `400` | Bad request — missing fields, invalid phone, unsupported type | Check `to`, `type`, and phone format |
-| `401` | Unauthorized | Check the `x-api-key` header |
+| `401` | Unauthorized | Check the `x-api-key` header or credentials |
+| `403` | Forbidden — instance belongs to another account | Use your own instances |
 | `404` | Instance or webhook not found | Verify the name/ID |
+| `409` | Conflict — email already registered | Use `/auth/login` instead |
 | `429` | Rate limit exceeded | Back off and retry |
 | `500` | Internal server error | Check server logs |
 | `503` | Instance not connected | Reconnect with `/connect` |
@@ -604,9 +701,11 @@ Configure an HTTP node:
 
 | Layer | Details |
 |-------|---------|
+| Multi-tenant isolation | Each account only accesses its own instances, webhooks, and logs |
+| Password hashing | scrypt via Node.js native crypto (no external dependencies) |
 | Timing-safe auth | Constant-time API key comparison (prevents timing attacks) |
 | Helmet | HTTP security headers |
-| Rate limiting | 100 req/min global · 30 send req/min per IP (configurable) |
+| Rate limiting | 100 req/min global · 30 send/min per IP · 10 auth/min per IP |
 | Body limit | 5 MB max per request |
 | SSRF protection | Media URLs must be HTTP/HTTPS — `file://` and others are rejected |
 | Path traversal | Instance names validated to `[a-zA-Z0-9_-]` only |
