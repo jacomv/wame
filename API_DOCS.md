@@ -247,6 +247,9 @@ POST /instances/:name/send
 | `text` | string | For `text` | Message body |
 | `url` | string | For media | Public URL of the file (HTTP/HTTPS only) |
 | `caption` | string | No | Caption for `image` |
+| `jpegThumbnail` | string | No | Base64-encoded JPEG (≤ 256KB) used as the inline chat preview for `image`. Use this to preserve aspect ratio for vertical images (e.g. 9:16) — generate a small JPEG (~256px on the long side) at the desired ratio and pass it here. Without it, WhatsApp may crop the inline preview for very tall images. |
+| `width` | integer | No | Image width in pixels for `image` (1–32768). Optional metadata to help the receiver render the preview correctly. |
+| `height` | integer | No | Image height in pixels for `image` (1–32768). Optional metadata to help the receiver render the preview correctly. |
 | `filename` | string | No | File name for `document` |
 | `mimetype` | string | No | MIME type for `document` (default: `application/octet-stream`) or `audio` (default: `audio/mpeg`) |
 | `ptt` | boolean | No | Send as voice note for `audio` (default: `false`) |
@@ -273,6 +276,25 @@ curl -X POST http://localhost:3000/instances/sales/send \
   -H "Content-Type: application/json" \
   -d '{"to": "5215551234567", "type": "image", "url": "https://example.com/invoice.png", "caption": "January invoice"}'
 ```
+
+**Vertical image with custom thumbnail** (preserves 9:16 aspect ratio in chat preview):
+
+```bash
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "5215551234567",
+    "type": "image",
+    "url": "https://example.com/story-1080x1920.jpg",
+    "caption": "Today'\''s devotional",
+    "width": 1080,
+    "height": 1920,
+    "jpegThumbnail": "/9j/4AAQSkZJRgABAQAAAQABAAD/..."
+  }'
+```
+
+The caller is responsible for generating the thumbnail (e.g. with `sharp` or `canvas`) at the desired aspect ratio and base64-encoding it. The server validates the magic bytes (`FF D8 FF`) and size (≤ 256KB) but does no image processing.
 
 #### Audio / voice note
 
