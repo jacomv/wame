@@ -247,9 +247,11 @@ POST /instances/:name/send
 | `text` | string | For `text` | Message body |
 | `url` | string | For media | Public URL of the file (HTTP/HTTPS only) |
 | `caption` | string | No | Caption for `image` |
-| `jpegThumbnail` | string | No | Base64-encoded JPEG (≤ 256KB) used as the inline chat preview for `image`. Use this to preserve aspect ratio for vertical images (e.g. 9:16) — generate a small JPEG (~256px on the long side) at the desired ratio and pass it here. Without it, WhatsApp may crop the inline preview for very tall images. |
-| `width` | integer | No | Image width in pixels for `image` (1–32768). Optional metadata to help the receiver render the preview correctly. |
-| `height` | integer | No | Image height in pixels for `image` (1–32768). Optional metadata to help the receiver render the preview correctly. |
+| `jpegThumbnail` | string | No | Base64-encoded JPEG (≤ 256KB) used as the inline chat preview for `image`. **Override only** — if you provide all three of `jpegThumbnail`, `width`, and `height`, the server uses your values verbatim. If any is missing, the server auto-generates them (see below). |
+| `width` | integer | No | Image width in pixels for `image` (1–32768). See `jpegThumbnail` for override semantics. |
+| `height` | integer | No | Image height in pixels for `image` (1–32768). See `jpegThumbnail` for override semantics. |
+
+**Auto-generated previews:** if you don't provide `jpegThumbnail` / `width` / `height` (or provide only some of them), the server downloads the image, normalizes it to JPEG with `sharp`, and lets Baileys auto-derive the dimensions and inline thumbnail. This is the default and produces correct previews for any aspect ratio (including vertical 9:16) without any work on the caller's side. Download cap: 16MB, timeout 15s.
 | `filename` | string | No | File name for `document` |
 | `mimetype` | string | No | MIME type for `document` (default: `application/octet-stream`) or `audio` (default: `audio/mpeg`) |
 | `ptt` | boolean | No | Send as voice note for `audio` (default: `false`) |
@@ -277,7 +279,9 @@ curl -X POST http://localhost:3000/instances/sales/send \
   -d '{"to": "5215551234567", "type": "image", "url": "https://example.com/invoice.png", "caption": "January invoice"}'
 ```
 
-**Vertical image with custom thumbnail** (preserves 9:16 aspect ratio in chat preview):
+Vertical / non-square images are handled automatically — the server downloads the URL, normalizes to JPEG, and Baileys generates the correct inline thumbnail. No extra fields needed.
+
+**Custom thumbnail override** (only when you want to control the preview manually — e.g. branded thumbnail, padding, custom crop):
 
 ```bash
 curl -X POST http://localhost:3000/instances/sales/send \
@@ -294,7 +298,7 @@ curl -X POST http://localhost:3000/instances/sales/send \
   }'
 ```
 
-The caller is responsible for generating the thumbnail (e.g. with `sharp` or `canvas`) at the desired aspect ratio and base64-encoding it. The server validates the magic bytes (`FF D8 FF`) and size (≤ 256KB) but does no image processing.
+All three fields (`jpegThumbnail`, `width`, `height`) must be present together to take effect. The server validates the thumbnail's magic bytes (`FF D8 FF`) and size (≤ 256KB).
 
 #### Audio / voice note
 
