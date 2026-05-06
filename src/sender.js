@@ -28,12 +28,42 @@ export async function sendMessage(sock, to, type, payload) {
       }
       return sock.sendMessage(to, { text: payload.text });
 
-    case 'image':
+    case 'image': {
       validateMediaUrl(payload.url);
-      return sock.sendMessage(to, {
+      const message = {
         image: { url: payload.url },
         caption: payload.caption ?? '',
-      });
+      };
+      if (payload.jpegThumbnail !== undefined && payload.jpegThumbnail !== null) {
+        if (typeof payload.jpegThumbnail !== 'string') {
+          throw new Error('jpegThumbnail debe ser un string base64');
+        }
+        const buf = Buffer.from(payload.jpegThumbnail, 'base64');
+        if (buf.length === 0) {
+          throw new Error('jpegThumbnail base64 inválido o vacío');
+        }
+        if (buf.length > 256 * 1024) {
+          throw new Error('jpegThumbnail debe ser ≤ 256KB');
+        }
+        if (buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff) {
+          throw new Error('jpegThumbnail debe ser un JPEG válido (magic bytes FF D8 FF)');
+        }
+        message.jpegThumbnail = buf;
+      }
+      if (payload.width !== undefined) {
+        if (!Number.isInteger(payload.width) || payload.width <= 0 || payload.width > 32768) {
+          throw new Error('width debe ser un entero positivo ≤ 32768');
+        }
+        message.width = payload.width;
+      }
+      if (payload.height !== undefined) {
+        if (!Number.isInteger(payload.height) || payload.height <= 0 || payload.height > 32768) {
+          throw new Error('height debe ser un entero positivo ≤ 32768');
+        }
+        message.height = payload.height;
+      }
+      return sock.sendMessage(to, message);
+    }
 
     case 'audio':
       validateMediaUrl(payload.url);
