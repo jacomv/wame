@@ -1,6 +1,6 @@
 {
   "name": "wame",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Minimal WhatsApp REST API — send messages and receive webhooks. No external services required.",
   "main": "src/index.js",
   "type": "module",
@@ -20,7 +20,14 @@
   },
   "license": "MIT",
   "author": "Jacobis A. <hola@masvirtual.co>",
-  "keywords": ["whatsapp", "baileys", "webhook", "rest-api", "nodejs", "docker"],
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "webhook",
+    "rest-api",
+    "nodejs",
+    "docker"
+  ],
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.16",
     "better-sqlite3": "^12.6.2",
@@ -31,7 +38,8 @@
     "helmet": "^8.1.0",
     "link-preview-js": "^3.2.0",
     "pino": "^8.17.2",
-    "qrcode": "^1.5.3"
+    "qrcode": "^1.5.3",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "vitest": "^4.1.0"
