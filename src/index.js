@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import db from './db.js';
 import { requireApiKey } from './auth.js';
 import { getAllStatus, restoreExistingSessions, shutdown } from './manager.js';
 import { getOwnedInstances } from './accounts.js';
@@ -85,15 +86,44 @@ const server = app.listen(PORT, async () => {
 });
 
 // ── Apagado limpio ──────────────────────────────────────────────
+// El plazo debe quedar por debajo del SIGKILL de Docker (10s por defecto):
+// si nos matan a mitad del cierre, el checkpoint de SQLite queda a medias.
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+let shuttingDown = false;
+
+function closeDatabase() {
+  try {
+    db.close(); // hace checkpoint del WAL y libera el archivo
+  } catch (err) {
+    console.error('[server] Error cerrando la base de datos:', err.message);
+  }
+}
+
 async function gracefulShutdown(signal) {
+  if (shuttingDown) return; // SIGTERM seguido de SIGINT no debe cerrar dos veces
+  shuttingDown = true;
+
   console.log(`\n[server] ${signal} recibido. Cerrando conexiones...`);
-  await shutdown();
+
+  // Forzar cierre si algo se cuelga, pero cerrando la BD primero.
+  const force = setTimeout(() => {
+    console.error('[server] Cierre forzado por timeout.');
+    closeDatabase();
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+
+  try {
+    await shutdown();
+  } catch (err) {
+    console.error('[server] Error cerrando instancias:', err.message);
+  }
+
   server.close(() => {
+    clearTimeout(force);
+    closeDatabase();
     console.log('[server] Servidor cerrado limpiamente.');
     process.exit(0);
   });
-  // Forzar cierre si tarda más de 10s
-  setTimeout(() => process.exit(1), 10_000);
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

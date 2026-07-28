@@ -1,5 +1,4 @@
 import makeWASocket, {
-  useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
@@ -10,27 +9,12 @@ import path from 'path';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { dispatch } from './webhooks.js';
+import { useSQLiteAuthState, clearAuthState, listStoredInstances } from './auth-state.js';
+import { cacheMessage, getCachedMessage, clearMessageCache } from './message-cache.js';
 
 const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
 const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
 const logger = pino({ level: 'silent' });
-
-// Caché de mensajes enviados para reintentos de descifrado (getMessage)
-// Evita el error "Esperando el mensaje" en el receptor
-const MSG_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
-const msgCache = new Map(); // key: `${instanceName}:${msgId}` → { message, timer }
-
-function cacheMessage(instanceName, msgId, message) {
-  const key = `${instanceName}:${msgId}`;
-  const existing = msgCache.get(key);
-  if (existing?.timer) clearTimeout(existing.timer);
-  const timer = setTimeout(() => msgCache.delete(key), MSG_CACHE_TTL);
-  msgCache.set(key, { message, timer });
-}
-
-function getCachedMessage(instanceName, msgId) {
-  return msgCache.get(`${instanceName}:${msgId}`)?.message ?? undefined;
-}
 
 // Map de instancias activas: name → { sock, status, qr, phone, connectedAt }
 const instances = new Map();
@@ -73,7 +57,7 @@ export async function connectInstance(name) {
 
   const sessionPath = path.join(SESSION_DIR, name);
   await mkdir(sessionPath, { recursive: true });
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+  const { state, saveCreds } = await useSQLiteAuthState(name, sessionPath);
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
@@ -91,6 +75,11 @@ export async function connectInstance(name) {
     shouldIgnoreJid: (jid) => jid?.endsWith('@newsletter') || false,
     getMessage: async (key) => {
       const msg = getCachedMessage(name, key.id);
+      if (!msg) {
+        // Baileys pidió el mensaje para responder a un retry receipt y no lo
+        // tenemos: ese mensaje quedará en "Esperando el mensaje" en el receptor.
+        console.warn(`[${name}] Retry de ${key.remoteJid} para ${key.id}: no está en caché, no se puede reenviar`);
+      }
       return msg;
     },
   });
@@ -150,12 +139,17 @@ export async function connectInstance(name) {
 
   // ── Webhook: mensajes entrantes ──────────────────────────────
   sock.ev.on('messages.upsert', ({ messages, type: upsertType }) => {
-    if (upsertType !== 'notify') return; // Solo mensajes nuevos, no historial
+    // Cachear siempre para los retries de getMessage: Baileys emite los mensajes
+    // propios con type 'append', no 'notify'. Sin esto, un retry receipt del
+    // receptor no encuentra el mensaje y queda en "Esperando el mensaje".
     for (const msg of messages) {
-      // Cachear todos los mensajes (propios incluidos) para getMessage retries
       if (msg.key.id && msg.message) {
         cacheMessage(name, msg.key.id, msg.message);
       }
+    }
+
+    if (upsertType !== 'notify') return; // Webhook solo para mensajes nuevos, no historial
+    for (const msg of messages) {
       if (msg.key.fromMe) continue; // Ignorar mensajes propios para webhook
       const from = msg.key.remoteJid;
       const pushName = msg.pushName || null;
@@ -262,6 +256,8 @@ export async function disconnectInstance(name) {
   instances.delete(name);
   reconnecting.delete(name);
   reconnectAttempts.delete(name);
+  clearMessageCache(name);
+  clearAuthState(name);
 
   // Borrar archivos de sesión
   const { rm } = await import('fs/promises');
@@ -274,17 +270,21 @@ export async function disconnectInstance(name) {
 // Al arrancar, reconectar instancias que tengan sesión guardada
 export async function restoreExistingSessions() {
   const { readdir } = await import('fs/promises');
+
+  // Sesiones ya migradas viven en SQLite; las que aún no, solo en disco.
+  const names = new Set(listStoredInstances());
   try {
     const entries = await readdir(SESSION_DIR, { withFileTypes: true });
-    const dirs = entries.filter((d) => d.isDirectory()).map((d) => d.name);
-
-    for (const name of dirs) {
-      console.log(`[manager] Restaurando sesión: ${name}`);
-      connectInstance(name).catch((e) => console.error(`[manager] Error restaurando ${name}:`, e));
+    for (const d of entries) {
+      if (d.isDirectory()) names.add(d.name);
     }
   } catch (err) {
-    if (err.code === 'ENOENT') return; // Directorio no existe, nada que restaurar
-    throw err;
+    if (err.code !== 'ENOENT') throw err; // ENOENT: nada en disco, seguimos con las de SQLite
+  }
+
+  for (const name of names) {
+    console.log(`[manager] Restaurando sesión: ${name}`);
+    connectInstance(name).catch((e) => console.error(`[manager] Error restaurando ${name}:`, e));
   }
 }
 

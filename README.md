@@ -176,11 +176,12 @@ Full examples in [API_DOCS.md](./API_DOCS.md).
 |----------|---------|-------------|
 | `API_KEY` | — | Admin API key (full access to all instances). Optional if using account system only. |
 | `PORT` | `3000` | Server port |
-| `SESSION_DIR` | `./data/sessions` | Baileys session storage |
+| `SESSION_DIR` | `./data/sessions` | Legacy file-based sessions (migrated to SQLite on first start) |
 | `DATA_DIR` | `./data` | SQLite database location |
 | `RATE_LIMIT` | `100` | Max requests/min (global) |
 | `SEND_RATE_LIMIT` | `30` | Max send requests/min per IP |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin |
+| `MSG_CACHE_TTL_HOURS` | `24` | How long a sent message is kept so it can be resent if the recipient fails to decrypt it. Lower it to reduce how long message content stays stored. |
 
 ---
 

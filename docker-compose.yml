@@ -2,6 +2,9 @@ services:
   wame:
     build: .
     restart: unless-stopped
+    # Margen para que el cierre limpio termine antes del SIGKILL. Matar el
+    # proceso a mitad de una escritura de claves Signal corrompe la sesión.
+    stop_grace_period: 30s
     ports:
       - "3000:3000"
     volumes:

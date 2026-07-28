@@ -1,6 +1,6 @@
 {
   "name": "wame",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Minimal WhatsApp REST API — send messages and receive webhooks. No external services required.",
   "main": "src/index.js",
   "type": "module",
