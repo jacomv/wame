@@ -182,6 +182,7 @@ Full examples in [API_DOCS.md](./API_DOCS.md).
 | `SEND_RATE_LIMIT` | `30` | Max send requests/min per IP |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin |
 | `MSG_CACHE_TTL_HOURS` | `24` | How long a sent message is kept so it can be resent if the recipient fails to decrypt it. Lower it to reduce how long message content stays stored. |
+| `UPDATE_CHECK` | `true` | Check GitHub for new WAME releases and npm for dependency updates. Set to `false` to make the install do no outbound calls. |
 
 ---
 

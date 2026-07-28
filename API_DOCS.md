@@ -147,6 +147,46 @@ No authentication required. For load balancers and Docker health checks.
 { "ok": true, "uptime": 3600.12 }
 ```
 
+The running version is deliberately **not** exposed here — this endpoint is
+public, and advertising the version tells anyone which known vulnerabilities to
+try. Use `GET /version` instead.
+
+---
+
+### Version and updates
+
+```
+GET /version
+```
+
+Requires authentication. Returns the running version and whether a newer release
+is published on GitHub. The GitHub lookup is cached for 6 hours and fails
+silently, so the endpoint keeps working with no internet — `latest` simply comes
+back `null`.
+
+```json
+{
+  "current": "1.2.0",
+  "latest": "1.2.0",
+  "updateAvailable": false,
+  "releaseUrl": "https://github.com/jacomv/wame/releases/tag/v1.2.0",
+  "enabled": true
+}
+```
+
+`enabled` is `false` when the server runs with `UPDATE_CHECK=false`; in that case
+no outbound request is made and `latest` is always `null`.
+
+To update, pull the new image and recreate the container:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+There is no in-app update endpoint by design: a container updating itself needs
+the Docker socket mounted, which grants host-level access to anyone who
+compromises the panel.
+
 ---
 
 ### All instances status

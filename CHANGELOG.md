@@ -5,6 +5,42 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-07-27
+
+Adds version visibility to the dashboard. Until now there was no way to tell
+which version an instance was running without shelling into the container,
+which made bug reports hard to act on and deploys hard to confirm.
+
+### Added
+
+- **Version shown in the dashboard sidebar**, linking to the changelog.
+- **Update notice.** When a newer release exists on GitHub, the sidebar shows a
+  banner with the version, the exact update command
+  (`docker compose pull && docker compose up -d`) and a link to the release
+  notes. It is a notification only — there is deliberately no in-app updater,
+  since self-updating a container requires mounting the Docker socket, which
+  would hand host-level access to anyone who compromises the panel.
+- **`GET /version`** returning the running version and update status. It
+  requires authentication on purpose: `/health` is public, and announcing the
+  version there tells anyone which known vulnerabilities to try.
+- **`UPDATE_CHECK`** environment variable (default `true`). Set it to `false`
+  and the install makes no outbound calls at all — this also covers the
+  dependency check, which previously phoned npm on every boot with no opt-out.
+
+### Fixed
+
+- **The update checker recommended prereleases.** `isNewer()` parsed
+  `7.0.0-rc13` into `NaN` components and reported it as a newer stable release,
+  so startup logs were suggesting an upgrade to a Baileys release candidate on a
+  production gateway. Prereleases are now never offered as updates, and a stable
+  release correctly supersedes a prerelease of the same version.
+
+### Changed
+
+- GitHub release lookups are cached for 6 hours, so many dashboard loads cost a
+  single API call and stay well inside the unauthenticated rate limit. Failures
+  are silent by design — the panel works the same with no internet.
+
 ## [1.1.0] — 2026-07-27
 
 Reliability release. Fixes the long-standing bug where some messages never
@@ -110,6 +146,7 @@ Initial release.
 - Dependency update checker, security hardening and rate limiting.
 - Automatic phone-number normalization to JID format.
 
+[1.2.0]: https://github.com/Jacobisaldana/wame/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Jacobisaldana/wame/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/Jacobisaldana/wame/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Jacobisaldana/wame/compare/v1.0.0...v1.0.1

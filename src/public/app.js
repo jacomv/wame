@@ -49,6 +49,46 @@ async function enterApp(apiKey) {
   document.getElementById('app').classList.remove('hidden');
   applyTranslations();
   startPolling();
+  loadVersion();
+}
+
+// ── Versión y actualizaciones ───────────────────────────────────
+let versionInfo = null;
+
+async function loadVersion() {
+  try {
+    versionInfo = await api('GET', '/version');
+  } catch {
+    versionInfo = null; // sin conexión o sin permiso: el panel sigue igual
+  }
+  renderVersion();
+}
+
+// Se vuelve a llamar al cambiar de idioma: estos textos no llevan data-i18n
+// porque se componen con la versión.
+function renderVersion() {
+  const link = document.getElementById('version-link');
+  const banner = document.getElementById('update-banner');
+  if (!link || !banner) return;
+
+  if (!versionInfo?.current) {
+    link.textContent = t('version.unknown');
+    link.removeAttribute('href');
+    banner.classList.add('hidden');
+    return;
+  }
+
+  link.textContent = `${t('version.label')} ${versionInfo.current}`;
+  link.href = 'https://github.com/jacomv/wame/blob/main/CHANGELOG.md';
+
+  if (versionInfo.updateAvailable && versionInfo.latest) {
+    document.getElementById('update-title').textContent =
+      t('update.available').replace('{v}', versionInfo.latest);
+    banner.href = versionInfo.releaseUrl || 'https://github.com/jacomv/wame/releases/latest';
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
 }
 
 async function doLogin() {
@@ -500,7 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Language toggle
   document.querySelectorAll('.lang-btn').forEach(btn => {
-    btn.addEventListener('click', () => setLang(btn.dataset.lang));
+    btn.addEventListener('click', () => { setLang(btn.dataset.lang); renderVersion(); });
   });
 
   // Mobile sidebar

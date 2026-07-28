@@ -14,6 +14,7 @@ import authRoutes from './routes/auth.js';
 import instanceRoutes from './routes/instances.js';
 import webhookRoutes from './routes/webhooks.js';
 import logRoutes from './routes/logs.js';
+import versionRoutes from './routes/version.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -76,6 +77,7 @@ app.get('/status', requireApiKey, (req, res) => {
 app.use('/instances', instanceRoutes);
 app.use('/instances', webhookRoutes);
 app.use('/logs', logRoutes);
+app.use('/version', versionRoutes);
 
 // ── Arranque ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;

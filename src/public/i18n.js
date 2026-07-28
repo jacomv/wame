@@ -22,6 +22,12 @@ const TRANSLATIONS = {
     'nav.logs':                'Logs',
     'sidebar.authenticated':   'Authenticated',
 
+    // Version / updates
+    'version.label':           'Version',
+    'version.unknown':         'Version unknown',
+    'update.available':        'v{v} available',
+    'update.how':              'Update with:',
+
     // Instances view
     'instances.title':         'Instances',
     'instances.new':           'New instance',
@@ -125,6 +131,12 @@ const TRANSLATIONS = {
     'nav.instances':           'Instancias',
     'nav.logs':                'Logs',
     'sidebar.authenticated':   'Autenticado',
+
+    // Versión / actualizaciones
+    'version.label':           'Versión',
+    'version.unknown':         'Versión desconocida',
+    'update.available':        'v{v} disponible',
+    'update.how':              'Actualiza con:',
 
     'instances.title':         'Instancias',
     'instances.new':           'Nueva instancia',

@@ -148,6 +148,23 @@ body {
 
 .sidebar-footer { padding: 0.75rem; border-top: 1px solid var(--border-2); display: flex; flex-direction: column; gap: 0.5rem; }
 
+.version-row { padding: 0.1rem 0.5rem 0.3rem; font-size: 0.75rem; color: var(--text-3); }
+.version-row a { color: inherit; text-decoration: none; }
+.version-row a:hover { color: var(--text-2); text-decoration: underline; }
+
+.update-banner {
+  display: block; padding: 0.55rem 0.6rem; border-radius: 6px;
+  background: var(--accent-dim); border: 1px solid rgba(34,197,94,0.25);
+  color: var(--accent); font-size: 0.75rem; line-height: 1.45; text-decoration: none;
+}
+.update-banner:hover { border-color: rgba(34,197,94,0.45); }
+.update-banner strong { display: block; font-weight: 600; margin-bottom: 0.2rem; }
+.update-banner code {
+  display: block; margin-top: 0.35rem; padding: 0.3rem 0.4rem; border-radius: 4px;
+  background: var(--surface-2); color: var(--text-2); font-size: 0.7rem;
+  line-height: 1.4; white-space: pre-wrap; word-break: break-word; user-select: all;
+}
+
 .user-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; }
 .user-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .user-label { font-size: 0.8125rem; color: var(--text-2); flex: 1; }
@@ -388,6 +405,14 @@ tr:hover td { background: var(--surface-2); }
       </button>
     </nav>
     <div class="sidebar-footer">
+      <a id="update-banner" class="update-banner hidden" target="_blank" rel="noopener noreferrer">
+        <strong id="update-title"></strong>
+        <span data-i18n="update.how">Update with:</span>
+        <code>docker compose pull &amp;&amp; docker compose up -d</code>
+      </a>
+      <div class="version-row">
+        <a id="version-link" target="_blank" rel="noopener noreferrer"></a>
+      </div>
       <div class="lang-toggle">
         <button class="lang-btn active" data-lang="en">EN</button>
         <button class="lang-btn" data-lang="es">ES</button>
