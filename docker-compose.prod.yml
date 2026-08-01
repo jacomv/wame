@@ -1,0 +1,30 @@
+services:
+  wame:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - wame_data:/data
+    environment:
+      API_KEY: ${API_KEY}
+      PORT: 3000
+      DATA_DIR: /data
+      SESSION_DIR: /data/sessions
+      WEBHOOKS_DIR: /data/webhooks
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://wame.soberanagracia.com}
+    networks:
+      - proxy
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.wame.rule: Host(`wame.soberanagracia.com`)
+      traefik.http.routers.wame.entrypoints: websecure
+      traefik.http.routers.wame.tls: "true"
+      traefik.http.routers.wame.tls.certresolver: le
+      traefik.http.services.wame.loadbalancer.server.port: "3000"
+
+networks:
+  proxy:
+    external: true
+
+volumes:
+  wame_data:
