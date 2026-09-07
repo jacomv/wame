@@ -62,6 +62,14 @@ Invalid or missing key returns:
 5. Send messages — `POST /instances/:name/send`.
 6. Register a webhook to receive incoming events — `POST /instances/:name/webhooks`.
 
+To broadcast to a channel instead of messaging a contact, add two steps:
+
+7. Register the channel once — `POST /instances/:name/newsletters` with its JID
+   or invite code. The response tells you whether the account may publish.
+8. Publish — `POST /instances/:name/newsletters/:jid/send`.
+
+See [Channels (newsletters)](#channels-newsletters).
+
 ---
 
 ## Endpoints
@@ -907,17 +915,147 @@ Configure an HTTP node:
 
 ---
 
+## Publishing to a channel — worked example
+
+Registering is a one-time setup step, not something to repeat per broadcast.
+Do it once (by hand or on first run), store the returned JID, and publish
+against that JID from then on.
+
+### Node.js
+
+```javascript
+const WAME_URL = "http://localhost:3000";
+const API_KEY  = "your-api-key";
+
+const api = async (path, options = {}) => {
+  const res = await fetch(`${WAME_URL}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(`${res.status}: ${body.error}`);
+  return body;
+};
+
+/**
+ * One-time setup. `invite` accepts the full whatsapp.com/channel/... link or
+ * the bare code. Returns the channel JID — persist it.
+ */
+async function registerChannel(instance, invite) {
+  const channel = await api(`/instances/${instance}/newsletters`, {
+    method: "POST",
+    body: JSON.stringify({ invite }),
+  });
+
+  // Check this before wiring up a broadcast job: a SUBSCRIBER cannot publish,
+  // and finding out at broadcast time means a failed send.
+  if (!channel.canPublish) {
+    throw new Error(`Cannot publish to "${channel.name}" — role is ${channel.role}, needs ADMIN or OWNER`);
+  }
+  return channel.jid;
+}
+
+/** Publish. Same payloads as /send — text, image, audio, document. */
+function publish(instance, jid, content) {
+  return api(`/instances/${instance}/newsletters/${jid}/send`, {
+    method: "POST",
+    body: JSON.stringify(content),
+  });
+}
+
+const jid = await registerChannel("main", "https://whatsapp.com/channel/0029VaAbCdEfGhIjKl");
+
+await publish("main", jid, { type: "text", text: "New release is out" });
+
+await publish("main", jid, {
+  type: "image",
+  url: "https://example.com/banner.jpg",
+  caption: "v1.3.0 is live",
+});
+```
+
+### Python
+
+```python
+import requests
+
+WAME_URL = "http://localhost:3000"
+API_KEY  = "your-api-key"
+
+def api(path: str, method: str = "GET", payload: dict | None = None):
+    r = requests.request(
+        method, f"{WAME_URL}{path}",
+        headers={"x-api-key": API_KEY}, json=payload,
+    )
+    if not r.ok:
+        raise RuntimeError(f"{r.status_code}: {r.json().get('error')}")
+    return r.json()
+
+def register_channel(instance: str, invite: str) -> str:
+    """One-time setup. Returns the channel JID — persist it."""
+    channel = api(f"/instances/{instance}/newsletters", "POST", {"invite": invite})
+    if not channel["canPublish"]:
+        raise RuntimeError(
+            f"Cannot publish to {channel['name']!r} — role is {channel['role']}, needs ADMIN or OWNER"
+        )
+    return channel["jid"]
+
+def publish(instance: str, jid: str, content: dict):
+    return api(f"/instances/{instance}/newsletters/{jid}/send", "POST", content)
+
+jid = register_channel("main", "https://whatsapp.com/channel/0029VaAbCdEfGhIjKl")
+publish("main", jid, {"type": "text", "text": "New release is out"})
+```
+
+### Listing what you can publish to
+
+```bash
+curl "http://localhost:3000/instances/main/newsletters" \
+  -H "x-api-key: your-api-key"
+```
+
+Filter on `canPublish` — roles change, so a channel registered as `OWNER` can
+come back as `SUBSCRIBER` later.
+
+```bash
+# Only the channels this account can currently post to
+curl -s "http://localhost:3000/instances/main/newsletters" \
+  -H "x-api-key: your-api-key" | jq '[.[] | select(.canPublish)]'
+```
+
+A channel with `"stale": true` could not be refreshed from WhatsApp — its
+values are the last known ones. Treat it as unpublishable until it recovers.
+
+### n8n / Make / Zapier
+
+Register the channel once with curl, then configure an HTTP node with the JID
+hardcoded in the URL:
+
+- **Method:** `POST`
+- **URL:** `http://your-server:3000/instances/main/newsletters/120363099999999999@newsletter/send`
+- **Headers:** `x-api-key: your-api-key`, `Content-Type: application/json`
+- **Body:**
+
+```json
+{ "type": "text", "text": "{{message}}" }
+```
+
+Note there is no `to` field — the destination is the JID in the path.
+
+---
+
 ## Error reference
 
 | HTTP Status | Meaning | Action |
 |-------------|---------|--------|
-| `400` | Bad request — missing fields, invalid phone, unsupported type | Check `to`, `type`, and phone format |
+| `400` | Bad request — missing fields, invalid phone, unsupported type, malformed channel JID or invite code | Check `to`, `type`, and phone/JID format |
 | `401` | Unauthorized | Check the `x-api-key` header or credentials |
-| `403` | Forbidden — instance belongs to another account | Use your own instances |
-| `404` | Instance or webhook not found | Verify the name/ID |
+| `403` | Forbidden — instance belongs to another account, or the account is not `ADMIN`/`OWNER` of the channel | Use your own instances; check `canPublish` before publishing |
+| `404` | Instance, webhook, or channel not found | Verify the name/ID; a channel must exist and be visible to this account |
 | `409` | Conflict — email already registered | Use `/auth/login` instead |
 | `429` | Rate limit exceeded | Back off and retry |
 | `500` | Internal server error | Check server logs |
+| `502` | WhatsApp rejected the channel lookup | Transient upstream failure — retry; if it persists, confirm the channel still exists |
 | `503` | Instance not connected | Reconnect with `/connect` |
 
 ---
