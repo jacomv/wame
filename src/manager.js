@@ -12,6 +12,7 @@ import { dispatch } from './webhooks.js';
 import { useSQLiteAuthState, clearAuthState, listStoredInstances } from './auth-state.js';
 import { cacheMessage, getCachedMessage, clearMessageCache } from './message-cache.js';
 import { clearNewsletters } from './newsletters.js';
+import { recordRetry, clearRetryLog } from './retry-log.js';
 
 const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
 const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
@@ -90,17 +91,10 @@ export async function connectInstance(name) {
     shouldIgnoreJid: (jid) => (NEWSLETTER_INBOUND ? false : jid?.endsWith('@newsletter') || false),
     getMessage: async (key) => {
       const msg = getCachedMessage(name, key.id);
-      if (!msg) {
-        // Baileys pidió el mensaje para responder a un retry receipt y no lo
-        // tenemos: ese mensaje quedará en "Esperando el mensaje" en el receptor.
-        console.warn(`[${name}] Retry de ${key.remoteJid} para ${key.id}: no está en caché, no se puede reenviar`);
-      } else {
-        // El acierto también se registra. Sin esto, un mensaje que sigue
-        // atascado no distingue entre "el retry nunca llegó", "llegó y no
-        // teníamos el original" y "lo reenviamos y aun así no se descifró"
-        // —que son tres causas distintas con arreglos distintos.
-        console.log(`[${name}] Retry de ${key.remoteJid} para ${key.id}: reenviando desde caché`);
-      }
+      // Baileys pide el mensaje para responder a un retry receipt. Registrar
+      // cada petición —con el participant y el número de intento— es lo único
+      // que distingue las tres causas de "Esperando el mensaje". Ver src/retry-log.js.
+      recordRetry({ instance: name, key, cacheHit: !!msg });
       return msg;
     },
   });
@@ -281,6 +275,7 @@ export async function disconnectInstance(name) {
   clearMessageCache(name);
   clearAuthState(name);
   clearNewsletters(name);
+  clearRetryLog(name);
 
   // Borrar archivos de sesión
   const { rm } = await import('fs/promises');
