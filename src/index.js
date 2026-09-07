@@ -12,6 +12,7 @@ import { getOwnedInstances } from './accounts.js';
 import { checkUpdates } from './updater.js';
 import authRoutes from './routes/auth.js';
 import instanceRoutes from './routes/instances.js';
+import newsletterRoutes from './routes/newsletters.js';
 import webhookRoutes from './routes/webhooks.js';
 import logRoutes from './routes/logs.js';
 import versionRoutes from './routes/version.js';
@@ -75,6 +76,7 @@ app.get('/status', requireApiKey, (req, res) => {
   res.json({ instances: all.filter(i => owned.has(i.name)) });
 });
 app.use('/instances', instanceRoutes);
+app.use('/instances', newsletterRoutes);
 app.use('/instances', webhookRoutes);
 app.use('/logs', logRoutes);
 app.use('/version', versionRoutes);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
 import { requireApiKey } from '../auth.js';
 import { validateInstanceName, normalizeJid, validatePhoneOrJid } from '../utils/jid.js';
+import { requireOwnership, sendLimiter } from '../utils/guards.js';
 import { connectInstance, getSocket, getInstanceStatus, disconnectInstance, restartInstance } from '../manager.js';
 import { sendMessage } from '../sender.js';
 import { logMessage } from '../logger.js';
@@ -9,33 +9,6 @@ import { dispatch, listWebhooks } from '../webhooks.js';
 import { assignInstance, getInstanceOwner, removeInstanceOwner } from '../accounts.js';
 
 const router = Router();
-
-// Rate limiting estricto para envío de mensajes: 30 req/min por IP
-const sendLimiter = rateLimit({
-  windowMs: 60_000,
-  max: parseInt(process.env.SEND_RATE_LIMIT || '30'),
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Límite de envío alcanzado. Intenta más tarde.' },
-});
-
-/** Middleware: verifica que el usuario autenticado sea dueño de la instancia */
-function requireOwnership(req, res, next) {
-  if (req.isAdmin) return next(); // Admin tiene acceso a todo
-
-  const { name } = req.params;
-  const owner = getInstanceOwner(name);
-
-  // Si no tiene dueño, permitir (instancia huérfana o nueva)
-  if (owner === null) return next();
-
-  // Si el dueño es otro, denegar
-  if (owner !== req.account?.id) {
-    return res.status(403).json({ error: 'No tienes acceso a esta instancia' });
-  }
-
-  next();
-}
 
 // ── Conectar / reconectar instancia ────────────────────────────
 router.post('/:name/connect', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
@@ -69,7 +42,9 @@ router.post('/:name/send', requireApiKey, validateInstanceName, requireOwnership
     return res.status(400).json({ error: 'Faltan campos: to, type' });
   }
 
-  if (!validatePhoneOrJid(to)) {
+  // allowNewsletter: publicar en un canal es el mismo sendMessage, solo cambia
+  // el JID (…@newsletter). Baileys detecta el servidor y usa la rama de canal.
+  if (!validatePhoneOrJid(to, { allowNewsletter: true })) {
     return res.status(400).json({ error: 'Formato de número/JID inválido' });
   }
 
@@ -194,7 +169,7 @@ router.get('/:name/profile-picture', requireApiKey, validateInstanceName, requir
   const { jid } = req.query;
   if (!jid) return res.status(400).json({ error: 'Query param "jid" requerido' });
 
-  if (!validatePhoneOrJid(jid)) {
+  if (!validatePhoneOrJid(jid, { allowNewsletter: true })) {
     return res.status(400).json({ error: 'Formato de JID inválido' });
   }
 

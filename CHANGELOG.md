@@ -5,6 +5,61 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-09-07
+
+Adds WhatsApp channels (newsletters). You can now publish text, images, audio
+and documents to a channel the account administers, through the same instance
+that already sends direct and group messages.
+
+### Added
+
+- **Channel endpoints** under `/instances/:name/newsletters`: register a channel
+  by JID or invite code, list registered channels, read a channel's metadata and
+  role, publish to it, and unregister it. Full reference in
+  [API_DOCS.md](./API_DOCS.md#channels-newsletters).
+- **A local channel registry** (SQLite `newsletters` table). This is not a
+  design preference — Baileys cannot enumerate the channels an account belongs
+  to. It has `groupFetchAllParticipating()` for groups and
+  `communityFetchAllParticipating()` for communities, but no channel
+  equivalent, in neither 6.7.x nor the 7.0.0-rc branch, and WhatsApp does not
+  include channels in the history sync WAME requests. So a channel is added
+  once by JID or invite and refreshed from then on.
+- **Publishing-role check.** Only `ADMIN` and `OWNER` may post to a channel.
+  The role is verified live before each publish, so a `SUBSCRIBER` gets a `403`
+  explaining why instead of the opaque server error WhatsApp returns.
+- **`NEWSLETTER_INBOUND`** environment variable (default `false`). Channel
+  messages reaching the `messages` webhook is opt-in: an account typically
+  follows dozens of third-party channels, and every post in every one of them
+  would fire the webhook. Publishing works regardless of this setting. Incoming
+  message payloads now carry `isNewsletter`.
+
+### Fixed
+
+- **Channels were actively unreachable.** `manager.js` passed
+  `shouldIgnoreJid: (jid) => jid?.endsWith('@newsletter')`, so anything
+  channel-related was dropped on arrival. It is now tied to
+  `NEWSLETTER_INBOUND` — and, since `shouldIgnoreJid` only filters inbound
+  traffic, publishing was never affected by it.
+- **`^6.7.16` resolved to a three-year-old build.** The Baileys maintainers
+  mispublished `6.17.16` (an old CommonJS build, 4 March 2025, 35 minutes
+  before `6.7.16`). Semver reads `6.17.16` as newer than every `6.7.x`, so it
+  is the highest version matching `^6.7.16` — a fresh `npm install` pulled it
+  instead of `6.7.24`. Docker builds using `npm ci` were protected by the
+  lockfile; anyone running `npm install` or `npm update` was not. The range is
+  now `~6.7.24`, which cannot reach it.
+
+### Changed
+
+- **Baileys 6.7.21 → 6.7.24.** Two upstream fixes, no API changes: spoofed
+  self-only protocol messages (history sync, app-state key share, LID
+  migration) are now dropped unless they come from our own device, and `fromMe`
+  is checked against both the PN and LID identities so peer-routed self stanzas
+  are no longer misread as someone else's.
+- `requireOwnership` and the send rate limiter moved to `src/utils/guards.js`.
+  Channel publishing shares the `SEND_RATE_LIMIT` budget with
+  `POST /instances/:name/send` deliberately — a second limiter would have
+  doubled the effective send quota.
+
 ## [1.2.0] — 2026-07-27
 
 Adds version visibility to the dashboard. Until now there was no way to tell
