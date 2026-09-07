@@ -5,6 +5,67 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-09-07
+
+Upgrades Baileys to 7.0.0-rc14. This fixes messages stuck on "Esperando el
+mensaje" for contacts WhatsApp has migrated to LID addressing — which, on the
+6.7.x branch, has no fix at all.
+
+### Fixed
+
+- **Messages never delivered to LID-addressed contacts.** Confirmed from a live
+  instance, not inferred:
+
+  ```
+  [retry] devocional msg=3EB08BDCEF665C0A9195A7 attempt=1/5 to=17927310987408@lid participant=12829671309370@lid addressing=LID cache=HIT
+  [retry] devocional msg=3EB08BDCEF665C0A9195A7 attempt=2/5 to=17927310987408@lid participant=17927310987408@lid addressing=LID cache=HIT — el reenvío anterior no se descifró
+  ```
+
+  The send was logged against `573004211788@s.whatsapp.net`, but the retry
+  receipts came back addressed by LID. WAME encrypted to the phone-number
+  identity while the recipient decrypted expecting the LID one, and Baileys
+  6.7.x ships **no LID↔PN mapping to translate between them** — `lib/Signal/`
+  contains no `lid-mapping.js` on that branch. `cache=HIT` on both attempts
+  rules out the message cache, and the resend used a session rebuilt from fresh
+  prekeys (`assertSessions(jids, force)` refetches unconditionally), which rules
+  out the crypto. Only the addressing was left.
+
+  7.x adds `LIDMappingStore` and wires `getLIDForPN` into the retry path, and
+  turns on `enableAutoSessionRecreation` and `enableRecentMessageCache` by
+  default.
+
+### Changed
+
+- **Baileys pinned to the exact version `7.0.0-rc14`**, not a range. It is a
+  prerelease, so a range could silently pull an rc15 with unknown changes.
+  Upstream now tags 6.7.24 as `legacy` and 7.0.0-rc as `latest`, so 6.7.x is
+  not a branch that will grow LID support.
+- **`check-number` reads `lid` from two places.** 6.7.x returned it inside
+  `onWhatsApp()`; 7.x does not — the mapping now lives in
+  `signalRepository.lidMapping`. The route tries both, so it works on either
+  version and degrades to `null` rather than failing the request.
+
+### Verified before merging
+
+- All seven Baileys exports WAME imports, and all ten `SocketConfig` options it
+  passes, exist unchanged in 7.x. `newsletterMetadata`,
+  `groupFetchAllParticipating` and `profilePictureUrl` keep their signatures.
+  Node engine is `>=20` in both.
+- **No QR re-scan needed.** `socket.js:764` emits `creds.update` with the
+  account's own LID on login, and `socket.js:855` applies it with
+  `Object.assign(creds, update)` — the same object reference
+  `useSQLiteAuthState` serializes, so `saveCreds()` persists it. The new
+  `lid-mapping`, `device-list` and `tctoken` key types store plain values, which
+  the generic `${type}-${id}` JSON store already handles without changes.
+- 99 tests pass. A real socket was constructed against WhatsApp under 7.x with
+  WAME's exact config and completed the Noise handshake through to QR emission.
+- **Not verified, and unverifiable without production traffic:** restoring an
+  authenticated 6.7.x session under 7.x, and actual delivery to the LID contact.
+  Rollback is `npm pkg set` back to `~6.7.24` plus `npm install`. Extra credential
+  fields and key types written by 7.x are simply never queried by 6.7.x, so
+  rolling back does not invalidate the session — it returns to the previous
+  behaviour, not to a worse one.
+
 ## [1.3.1] — 2026-09-07
 
 Diagnostic release. "Esperando el mensaje" was reported again on 1.3.0 and

@@ -116,17 +116,30 @@ router.post('/:name/check-number', requireApiKey, validateInstanceName, requireO
     res.json({
       exists: !!result?.exists,
       jid: result?.jid ?? null,
-      // onWhatsApp() devuelve también la identidad LID del contacto, si tiene.
-      // Se descartaba, y es justo el dato que hace falta para diagnosticar los
-      // mensajes atascados en "Esperando el mensaje": Baileys 6.7.x no tiene
-      // mapeo LID↔PN, así que un contacto ya migrado a LID es una causa
-      // plausible de fallo de descifrado en el receptor.
-      lid: result?.lid ?? null,
+      // Identidad LID del contacto, o null si no tiene o no se conoce todavía.
+      // Se lee de dos sitios porque cambió de lugar: 6.7.x la incluía en la
+      // respuesta de onWhatsApp(), y 7.x ya no —ahora vive en el
+      // LIDMappingStore del signalRepository, que es quien traduce LID↔PN al
+      // cifrar. Probar ambos deja la ruta funcionando en las dos versiones.
+      lid: result?.lid ?? (await lookupLid(sock, jid)),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+/**
+ * Consulta el LID de un número en el LIDMappingStore (Baileys 7.x).
+ * Devuelve null en 6.7.x, donde el store no existe, y ante cualquier fallo:
+ * es un dato de diagnóstico, no vale hacer caer la petición por él.
+ */
+async function lookupLid(sock, jid) {
+  try {
+    return (await sock.signalRepository?.lidMapping?.getLIDForPN?.(jid)) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Test webhook: dispara payload de prueba y reporta resultado ─
 router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
