@@ -102,6 +102,33 @@ Supports `text`, `image`, `audio` (with voice note mode), and `document`.
 
 ---
 
+## Publish to a channel
+
+Channels (newsletters) are broadcast threads. Register one once — by invite link
+or JID — then publish to it. The account must be `ADMIN` or `OWNER` of the
+channel.
+
+```bash
+# 1. Register. Returns the channel JID and whether you can publish.
+curl -X POST http://localhost:3000/instances/my-number/newsletters \
+  -H "x-api-key: your-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"invite": "https://whatsapp.com/channel/0029VaAbCdEfGhIjKl"}'
+
+# 2. Publish. Same message types as /send.
+curl -X POST "http://localhost:3000/instances/my-number/newsletters/120363099999999999@newsletter/send" \
+  -H "x-api-key: your-secret-key" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "text", "text": "New release is out"}'
+```
+
+Registration is a one-time step because there is no way to enumerate the
+channels an account belongs to — Baileys has no channel equivalent of
+`groupFetchAllParticipating()`, so WAME keeps its own registry. Full detail and
+client examples in [API_DOCS.md](./API_DOCS.md#channels-newsletters).
+
+---
+
 ## Receive messages via webhook
 
 Register a URL to receive incoming messages:
