@@ -5,6 +5,48 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] — 2026-09-07
+
+Diagnostic release. "Esperando el mensaje" was reported again on 1.3.0 and
+took several rounds of cross-referencing timestamps by hand to get to a
+"probably", because the logs could not answer the question.
+
+### Added
+
+- **Every retry receipt is now logged**, one line per request, unconditionally:
+
+  ```
+  [retry] devocional msg=3EB0A1 attempt=2/5 to=…@s.whatsapp.net participant=…@lid addressing=LID cache=HIT
+  ```
+
+  `attempt=N/5` is the field that was missing. It distinguishes "the retry never
+  arrived" from "it arrived and the original was gone" from "we resent it and it
+  failed again" — three causes with three different fixes, previously
+  indistinguishable. It also warns when Baileys reaches `maxMsgRetryCount` and
+  silently stops resending, which is where a stuck message actually dies.
+
+  `addressing` classifies the target as `PN`/`LID`/`GROUP`/`NEWSLETTER`. This
+  matters because the libsignal session dumps already present in the logs print
+  crypto material — `registrationId`, `remoteIdentityKey`, raw buffers — and
+  **never a JID**, so they cannot answer which address is being encrypted to.
+
+- **`BAILEYS_LOG_LEVEL`** (default `silent`, no behaviour change) exposes the
+  Baileys logger for deeper inspection. The `[retry]` lines are deliberately
+  *not* behind it: the libsignal dumps are `console.info` from
+  `session_record.js:273` and cannot be silenced by pino anyway, so the useful
+  lines should not be the ones that are off.
+
+- **`check-number` now returns `lid`.** `onWhatsApp()` returns the contact's LID
+  identity alongside `jid` and the route was discarding it. Baileys 6.7.x ships
+  no LID↔PN mapping at all (`lib/Signal/lid-mapping.js` exists only in
+  7.0.0-rc), so a LID-addressed contact is a plausible cause of recipient-side
+  decryption failure — and this is the field that shows it.
+
+### Notes
+
+No fix for the underlying stuck-message cause, because it is not yet confirmed.
+This release is what makes it confirmable in one look instead of forty minutes.
+
 ## [1.3.0] — 2026-09-07
 
 Adds WhatsApp channels (newsletters). You can now publish text, images, audio
