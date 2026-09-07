@@ -482,6 +482,160 @@ GET /instances/:name/groups/:groupId/participants
 
 ---
 
+## Channels (newsletters)
+
+WhatsApp channels are one-way broadcast threads. Their JID uses the
+`@newsletter` server (`120363099999999999@newsletter`) instead of
+`@s.whatsapp.net` or `@g.us`.
+
+**Publishing requires the account to be `ADMIN` or `OWNER` of the channel.** A
+`SUBSCRIBER` cannot post — WAME checks the role and returns `403` rather than
+letting WhatsApp reject it with an opaque error.
+
+### Why channels must be registered
+
+There is no way to enumerate the channels an account belongs to. Baileys has
+`groupFetchAllParticipating()` for groups and `communityFetchAllParticipating()`
+for communities, but no channel equivalent — not in 6.7.x and not in the
+7.0.0-rc branch. WhatsApp does not include channels in the history sync WAME
+requests either.
+
+So WAME keeps its own registry: you add a channel once by JID or invite code,
+and from then on it can be listed and refreshed.
+
+---
+
+### Register a channel
+
+```
+POST /instances/:name/newsletters
+```
+
+Give it either a `jid` or an `invite`. The invite accepts the full link or the
+bare code — whichever you copied.
+
+```bash
+curl -X POST http://localhost:3000/instances/main/newsletters \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"invite": "https://whatsapp.com/channel/0029VaAbCdEfGhIjKl"}'
+```
+
+```json
+{
+  "jid": "120363099999999999@newsletter",
+  "name": "Announcements",
+  "description": "Product updates",
+  "invite": "0029VaAbCdEfGhIjKl",
+  "subscribers": 1284,
+  "verification": "UNVERIFIED",
+  "role": "OWNER",
+  "muted": false,
+  "createdAt": 1700000000,
+  "canPublish": true
+}
+```
+
+Status `201`. Returns `404` if the channel does not exist or is not visible to
+this account, `502` if WhatsApp rejected the lookup.
+
+---
+
+### List registered channels
+
+```
+GET /instances/:name/newsletters
+```
+
+Returns the registered channels, refreshing each one against WhatsApp. A
+channel that can no longer be read (deleted, or the account lost access) comes
+back with its stored values and `"stale": true` instead of failing the whole
+request.
+
+```json
+[
+  {
+    "jid": "120363099999999999@newsletter",
+    "name": "Announcements",
+    "subscribers": 1284,
+    "role": "OWNER",
+    "canPublish": true,
+    "stale": false,
+    "trackedAt": "2026-09-07T12:00:00.000Z"
+  }
+]
+```
+
+---
+
+### Channel metadata
+
+```
+GET /instances/:name/newsletters/:jid
+```
+
+Works whether or not the channel is registered — use it to inspect a channel
+and see what role the account has before adding it. The response adds
+`"tracked": true|false`.
+
+---
+
+### Publish to a channel
+
+```
+POST /instances/:name/newsletters/:jid/send
+```
+
+Same body as [Send message](#send-message) minus the `to` field (the JID is in
+the path). All four types work — `text`, `image`, `audio`, `document`.
+
+```bash
+curl -X POST "http://localhost:3000/instances/main/newsletters/120363099999999999@newsletter/send" \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "text", "text": "New release is out"}'
+```
+
+```json
+{ "ok": true }
+```
+
+Returns `403` when the account's role is not `ADMIN` or `OWNER`.
+
+This route shares the `SEND_RATE_LIMIT` budget with `POST /instances/:name/send`
+on purpose — a separate quota would double the effective send limit.
+
+`POST /instances/:name/send` also accepts a channel JID in `to`, which is
+handy if your integration already builds that call. The dedicated route is
+preferable because it verifies the publishing role first.
+
+---
+
+### Unregister a channel
+
+```
+DELETE /instances/:name/newsletters/:jid
+```
+
+Removes it from WAME's registry only — the account keeps following the channel
+on WhatsApp.
+
+```json
+{ "ok": true }
+```
+
+---
+
+### Receiving channel messages
+
+Off by default. An account typically follows dozens of third-party channels, and
+every post in every one of them would fire the `messages` webhook.
+
+Set `NEWSLETTER_INBOUND=true` to receive them. Channel messages then arrive
+through the ordinary `messages` webhook with `"isNewsletter": true`.
+
+---
+
 ### Disconnect instance
 
 ```
@@ -521,10 +675,15 @@ Webhooks let you receive real-time events from WhatsApp (incoming messages, grou
     "type": "text",
     "text": "Hello!",
     "messageId": "ABCDEF123456",
-    "isGroup": false
+    "isGroup": false,
+    "isNewsletter": false
   }
 }
 ```
+
+`isNewsletter` is always `false` unless `NEWSLETTER_INBOUND=true` — channel
+messages are dropped before this point otherwise. See
+[Receiving channel messages](#receiving-channel-messages).
 
 Webhooks are fire-and-forget with a 5-second timeout per attempt.
 

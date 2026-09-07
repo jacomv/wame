@@ -11,10 +11,19 @@ import QRCode from 'qrcode';
 import { dispatch } from './webhooks.js';
 import { useSQLiteAuthState, clearAuthState, listStoredInstances } from './auth-state.js';
 import { cacheMessage, getCachedMessage, clearMessageCache } from './message-cache.js';
+import { clearNewsletters } from './newsletters.js';
 
 const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
 const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
 const logger = pino({ level: 'silent' });
+
+// Publicar en un canal funciona siempre: shouldIgnoreJid solo filtra lo que
+// entra (messages-recv, chats), nunca lo que se envía.
+//
+// Recibir es lo que va apagado por omisión: una cuenta suele seguir decenas de
+// canales de terceros, y cada publicación de cada uno dispararía el webhook
+// 'messages'. Quien quiera esos eventos lo activa explícitamente.
+const NEWSLETTER_INBOUND = process.env.NEWSLETTER_INBOUND === 'true';
 
 // Map de instancias activas: name → { sock, status, qr, phone, connectedAt }
 const instances = new Map();
@@ -72,7 +81,7 @@ export async function connectInstance(name) {
     generateHighQualityLinkPreview: true,
     syncFullHistory: false,
     markOnlineOnConnect: false,
-    shouldIgnoreJid: (jid) => jid?.endsWith('@newsletter') || false,
+    shouldIgnoreJid: (jid) => (NEWSLETTER_INBOUND ? false : jid?.endsWith('@newsletter') || false),
     getMessage: async (key) => {
       const msg = getCachedMessage(name, key.id);
       if (!msg) {
@@ -172,6 +181,7 @@ export async function connectInstance(name) {
         text,
         messageId: msg.key.id,
         isGroup: from?.endsWith('@g.us') || false,
+        isNewsletter: from?.endsWith('@newsletter') || false,
       });
     }
   });
@@ -258,6 +268,7 @@ export async function disconnectInstance(name) {
   reconnectAttempts.delete(name);
   clearMessageCache(name);
   clearAuthState(name);
+  clearNewsletters(name);
 
   // Borrar archivos de sesión
   const { rm } = await import('fs/promises');
