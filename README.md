@@ -216,6 +216,28 @@ Full examples in [API_DOCS.md](./API_DOCS.md).
 | `MSG_CACHE_TTL_HOURS` | `24` | How long a sent message is kept so it can be resent if the recipient fails to decrypt it. Lower it to reduce how long message content stays stored. |
 | `UPDATE_CHECK` | `true` | Check GitHub for new WAME releases and npm for dependency updates. Set to `false` to make the install do no outbound calls. |
 | `NEWSLETTER_INBOUND` | `false` | Deliver channel (newsletter) messages to the `messages` webhook. Off by default: an account usually follows dozens of third-party channels and every post would fire the webhook. Publishing to channels works either way. |
+| `BAILEYS_LOG_LEVEL` | `silent` | Baileys log level (`silent`, `error`, `warn`, `info`, `debug`, `trace`). Raise it to `debug` for deeper diagnosis of messages stuck on "Waiting for this message". Noisy in production — the `[retry]` lines below are logged regardless. |
+
+### Diagnosing "Waiting for this message"
+
+Every retry receipt is logged unconditionally, one line each:
+
+```
+[retry] devocional msg=3EB0A1 attempt=1/5 to=573004211788@s.whatsapp.net participant=- addressing=PN cache=HIT
+```
+
+Read it as follows:
+
+| Symptom | Meaning |
+|---|---|
+| No `[retry]` line at all for the message | The recipient never asked for a resend. Nothing on the sending side can fix it. |
+| `cache=MISS` | The retry arrived but the original was gone — the resend is impossible. |
+| `attempt=` climbing to `2/5`, `3/5`… | Each resend also failed to decrypt. Baileys resends with a session rebuilt from fresh prekeys, so repeated failures point at *addressing*, not at the crypto. |
+| `addressing=LID` | The target is a LID-addressed contact. Baileys 6.7.x carries no LID↔PN mapping (`lib/Signal/lid-mapping.js` exists only in 7.0.0-rc), which makes this a likely cause of the failure. |
+
+```bash
+docker compose logs --since 1h | grep '\[retry\]'
+```
 
 ---
 

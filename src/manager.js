@@ -12,10 +12,17 @@ import { dispatch } from './webhooks.js';
 import { useSQLiteAuthState, clearAuthState, listStoredInstances } from './auth-state.js';
 import { cacheMessage, getCachedMessage, clearMessageCache } from './message-cache.js';
 import { clearNewsletters } from './newsletters.js';
+import { recordRetry, clearRetryLog } from './retry-log.js';
 
 const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
 const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
-const logger = pino({ level: 'silent' });
+
+// Silenciado por omisión: Baileys en 'debug' es muy ruidoso para producción.
+// Pero silenciarlo del todo dejaba ciego el diagnóstico de "Esperando el
+// mensaje": los avisos de que llegó un retry receipt, de que se forzó una
+// sesión nueva o de que un mensaje no se pudo descifrar salen todos del logger
+// de Baileys, no del nuestro. BAILEYS_LOG_LEVEL=debug los saca a la luz.
+const logger = pino({ level: process.env.BAILEYS_LOG_LEVEL || 'silent' });
 
 // Publicar en un canal funciona siempre: shouldIgnoreJid solo filtra lo que
 // entra (messages-recv, chats), nunca lo que se envía.
@@ -84,11 +91,10 @@ export async function connectInstance(name) {
     shouldIgnoreJid: (jid) => (NEWSLETTER_INBOUND ? false : jid?.endsWith('@newsletter') || false),
     getMessage: async (key) => {
       const msg = getCachedMessage(name, key.id);
-      if (!msg) {
-        // Baileys pidió el mensaje para responder a un retry receipt y no lo
-        // tenemos: ese mensaje quedará en "Esperando el mensaje" en el receptor.
-        console.warn(`[${name}] Retry de ${key.remoteJid} para ${key.id}: no está en caché, no se puede reenviar`);
-      }
+      // Baileys pide el mensaje para responder a un retry receipt. Registrar
+      // cada petición —con el participant y el número de intento— es lo único
+      // que distingue las tres causas de "Esperando el mensaje". Ver src/retry-log.js.
+      recordRetry({ instance: name, key, cacheHit: !!msg });
       return msg;
     },
   });
@@ -269,6 +275,7 @@ export async function disconnectInstance(name) {
   clearMessageCache(name);
   clearAuthState(name);
   clearNewsletters(name);
+  clearRetryLog(name);
 
   // Borrar archivos de sesión
   const { rm } = await import('fs/promises');
