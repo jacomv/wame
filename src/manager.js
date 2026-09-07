@@ -15,7 +15,13 @@ import { clearNewsletters } from './newsletters.js';
 
 const SESSION_DIR = process.env.SESSION_DIR || './data/sessions';
 const QR_TIMEOUT_MS = 60_000; // Timeout para esperar QR/conexión
-const logger = pino({ level: 'silent' });
+
+// Silenciado por omisión: Baileys en 'debug' es muy ruidoso para producción.
+// Pero silenciarlo del todo dejaba ciego el diagnóstico de "Esperando el
+// mensaje": los avisos de que llegó un retry receipt, de que se forzó una
+// sesión nueva o de que un mensaje no se pudo descifrar salen todos del logger
+// de Baileys, no del nuestro. BAILEYS_LOG_LEVEL=debug los saca a la luz.
+const logger = pino({ level: process.env.BAILEYS_LOG_LEVEL || 'silent' });
 
 // Publicar en un canal funciona siempre: shouldIgnoreJid solo filtra lo que
 // entra (messages-recv, chats), nunca lo que se envía.
@@ -88,6 +94,12 @@ export async function connectInstance(name) {
         // Baileys pidió el mensaje para responder a un retry receipt y no lo
         // tenemos: ese mensaje quedará en "Esperando el mensaje" en el receptor.
         console.warn(`[${name}] Retry de ${key.remoteJid} para ${key.id}: no está en caché, no se puede reenviar`);
+      } else {
+        // El acierto también se registra. Sin esto, un mensaje que sigue
+        // atascado no distingue entre "el retry nunca llegó", "llegó y no
+        // teníamos el original" y "lo reenviamos y aun así no se descifró"
+        // —que son tres causas distintas con arreglos distintos.
+        console.log(`[${name}] Retry de ${key.remoteJid} para ${key.id}: reenviando desde caché`);
       }
       return msg;
     },

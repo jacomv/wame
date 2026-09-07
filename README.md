@@ -216,6 +216,7 @@ Full examples in [API_DOCS.md](./API_DOCS.md).
 | `MSG_CACHE_TTL_HOURS` | `24` | How long a sent message is kept so it can be resent if the recipient fails to decrypt it. Lower it to reduce how long message content stays stored. |
 | `UPDATE_CHECK` | `true` | Check GitHub for new WAME releases and npm for dependency updates. Set to `false` to make the install do no outbound calls. |
 | `NEWSLETTER_INBOUND` | `false` | Deliver channel (newsletter) messages to the `messages` webhook. Off by default: an account usually follows dozens of third-party channels and every post would fire the webhook. Publishing to channels works either way. |
+| `BAILEYS_LOG_LEVEL` | `silent` | Baileys log level (`silent`, `error`, `warn`, `info`, `debug`, `trace`). Raise it to `debug` to diagnose messages stuck on "Waiting for this message" — retry receipts and decryption failures are reported by Baileys, not by WAME. Noisy in production. |
 
 ---
 
