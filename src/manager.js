@@ -180,8 +180,16 @@ export async function connectInstance(name) {
 
       if (!msgType) continue; // Ignorar reacciones, stickers, polls, etc.
 
+      // En grupos, `from` es el JID del grupo: el remitente real viene en
+      // key.participant. Se reenvía junto al teléfono ya resuelto para que el
+      // consumidor del webhook pueda identificar a la persona sin depender de
+      // pushName, que cada quien cambia a voluntad.
+      const participant = msg.key.participant || null;
+
       dispatch(name, 'messages', {
         from,
+        participant,
+        senderPhone: participant ? resolvePhone(sock, participant) : resolvePhone(sock, from),
         pushName,
         type: msgType,
         text,

@@ -679,6 +679,8 @@ Webhooks let you receive real-time events from WhatsApp (incoming messages, grou
   "timestamp": "2025-01-15T10:30:00.000Z",
   "data": {
     "from": "5215551234567@s.whatsapp.net",
+    "participant": null,
+    "senderPhone": "5215551234567",
     "pushName": "John",
     "type": "text",
     "text": "Hello!",
@@ -688,6 +690,11 @@ Webhooks let you receive real-time events from WhatsApp (incoming messages, grou
   }
 }
 ```
+
+In groups, `from` is the group JID. `participant` carries the JID of whoever
+wrote the message (`null` in direct chats) and `senderPhone` the phone number
+already resolved — including when the participant arrives as a `@lid` — which
+is the stable identifier for who spoke.
 
 `isNewsletter` is always `false` unless `NEWSLETTER_INBOUND=true` — channel
 messages are dropped before this point otherwise. See
