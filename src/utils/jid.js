@@ -46,7 +46,9 @@ export function validatePhoneOrJid(to, { allowNewsletter = false } = {}) {
   // Si tiene @, es un JID completo — aceptar formato grupo o individual
   if (trimmed.includes('@')) {
     if (allowNewsletter && isNewsletterJid(trimmed)) return true;
-    return /^[\w.-]+@(s\.whatsapp\.net|g\.us)$/.test(trimmed);
+    // @lid es como WhatsApp entrega hoy a los participantes de un grupo: sin
+    // aceptarlo no se puede consultar por su JID a nadie de un grupo.
+    return /^[\w.-]+@(s\.whatsapp\.net|g\.us|lid)$/.test(trimmed);
   }
   // Solo número: limpiar formato y validar entre 7 y 15 dígitos (E.164 sin +)
   const cleaned = trimmed.replace(/[\s+()-]/g, '');
