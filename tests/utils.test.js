@@ -33,6 +33,10 @@ describe('validatePhoneOrJid', () => {
     expect(validatePhoneOrJid('1234567890123456')).toBe(false);
   });
 
+  it('accepts LID JIDs, which is how group participants arrive', () => {
+    expect(validatePhoneOrJid('193982298615891@lid')).toBe(true);
+  });
+
   it('accepts valid individual JIDs', () => {
     expect(validatePhoneOrJid('5491155551234@s.whatsapp.net')).toBe(true);
   });
