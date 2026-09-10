@@ -5,6 +5,49 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-09-10
+
+Makes the sender of a group message identifiable. Until now a webhook consumer
+receiving a group message had no reliable way to tell who wrote it, and no way
+to ask WhatsApp about a group member it had just been handed.
+
+### Added
+
+- **`participant` and `senderPhone` in the `messages` webhook payload.** In a
+  group, `from` is the group's JID, so the only trace of the author was
+  `pushName` — a profile name its owner changes at will, that need not be
+  unique within a group, and that has no relation to the contact name the
+  operator has saved. Observed in a live group: the members' actual pushNames
+  were `dvilla`, `JJTorres` and `henrryuchamocha`, none of which resembles the
+  saved contact. Any automation that has to know *who* spoke — an admin-only
+  bot, a participation counter, a moderator, a ticket queue — had nothing
+  dependable to key on.
+
+  `participant` carries `key.participant` verbatim (`null` in direct chats) and
+  `senderPhone` the number resolved through the existing `resolvePhone()`,
+  which already handles participants delivered as `@lid`. Both are additive:
+  a consumer reading only `from` and `pushName` is unaffected.
+
+### Fixed
+
+- **`@lid` JIDs were rejected by the API that hands them out.**
+  `validatePhoneOrJid()` accepted `@s.whatsapp.net` and `@g.us` only, while
+  `GET /instances/:name/groups/:id/participants` returns every member as
+  `@lid` — that is how WhatsApp addresses group participants now. Feeding one
+  of those JIDs straight back into `GET /profile-picture` answered
+  `400 Formato de JID inválido`. Any lookup keyed on a JID obtained from a
+  group was unreachable.
+
+  Note that WhatsApp itself still answers `profilePictureUrl()` with `null` for
+  a `@lid`, so this unblocks the validation, not the picture.
+
+### Note on 1.4.0
+
+`1.4.0` shipped in `package.json` and in this file on 2026-09-07 but was never
+tagged, so `releases/latest` — which `updater.js` polls — still pointed at
+`v1.3.0` and no running instance was told the LID addressing fix existed. It is
+tagged retroactively alongside this release.
+
 ## [1.4.0] — 2026-09-07
 
 Upgrades Baileys to 7.0.0-rc14. This fixes messages stuck on "Esperando el
