@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 
-const ALLOWED_TYPES = new Set(['text', 'image', 'audio', 'document']);
+const ALLOWED_TYPES = new Set(['text', 'image', 'video', 'audio', 'document']);
 const MAX_IMAGE_DOWNLOAD_BYTES = 16 * 1024 * 1024;
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 15000;
 
@@ -97,6 +97,42 @@ export async function sendMessage(sock, to, type, payload) {
       return sock.sendMessage(to, {
         image: jpegBuf,
         caption: payload.caption ?? '',
+      });
+    }
+
+    case 'video': {
+      validateMediaUrl(payload.url);
+
+      const gifPlayback = payload.gifPlayback ?? false;
+      const ptv = payload.ptv ?? false;
+
+      if (typeof gifPlayback !== 'boolean') {
+        throw new Error('gifPlayback debe ser un booleano');
+      }
+      if (typeof ptv !== 'boolean') {
+        throw new Error('ptv debe ser un booleano');
+      }
+      if (gifPlayback && ptv) {
+        throw new Error('gifPlayback y ptv son mutuamente excluyentes');
+      }
+
+      // Los video notes (ptv) no admiten caption en WhatsApp.
+      if (ptv) {
+        if (payload.caption) {
+          throw new Error('Un video note (ptv) no admite caption');
+        }
+        return sock.sendMessage(to, {
+          video: { url: payload.url },
+          mimetype: payload.mimetype ?? 'video/mp4',
+          ptv: true,
+        });
+      }
+
+      return sock.sendMessage(to, {
+        video: { url: payload.url },
+        caption: payload.caption ?? '',
+        mimetype: payload.mimetype ?? 'video/mp4',
+        gifPlayback,
       });
     }
 
