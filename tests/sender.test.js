@@ -84,6 +84,74 @@ describe('sendMessage', () => {
     ).rejects.toThrow('jpegThumbnail debe ser un JPEG válido');
   });
 
+  it('sends a video message with caption', async () => {
+    const sock = createMockSocket();
+    await sendMessage(sock, '5491155551234@s.whatsapp.net', 'video', {
+      url: 'https://example.com/clip.mp4',
+      caption: 'Mi video',
+    });
+
+    expect(sock.sendMessage).toHaveBeenCalledWith(
+      '5491155551234@s.whatsapp.net',
+      {
+        video: { url: 'https://example.com/clip.mp4' },
+        caption: 'Mi video',
+        mimetype: 'video/mp4',
+        gifPlayback: false,
+      },
+    );
+  });
+
+  it('sends a video as a looping GIF', async () => {
+    const sock = createMockSocket();
+    await sendMessage(sock, '5491155551234@s.whatsapp.net', 'video', {
+      url: 'https://example.com/clip.mp4',
+      gifPlayback: true,
+    });
+
+    const [, content] = sock.sendMessage.mock.calls[0];
+    expect(content.gifPlayback).toBe(true);
+  });
+
+  it('sends a video note (ptv) without caption field', async () => {
+    const sock = createMockSocket();
+    await sendMessage(sock, '5491155551234@s.whatsapp.net', 'video', {
+      url: 'https://example.com/note.mp4',
+      ptv: true,
+    });
+
+    expect(sock.sendMessage).toHaveBeenCalledWith(
+      '5491155551234@s.whatsapp.net',
+      {
+        video: { url: 'https://example.com/note.mp4' },
+        mimetype: 'video/mp4',
+        ptv: true,
+      },
+    );
+  });
+
+  it('rejects a video note with a caption', async () => {
+    const sock = createMockSocket();
+    await expect(
+      sendMessage(sock, '5491155551234@s.whatsapp.net', 'video', {
+        url: 'https://example.com/note.mp4',
+        ptv: true,
+        caption: 'Hola',
+      }),
+    ).rejects.toThrow('no admite caption');
+  });
+
+  it('rejects combining gifPlayback and ptv', async () => {
+    const sock = createMockSocket();
+    await expect(
+      sendMessage(sock, '5491155551234@s.whatsapp.net', 'video', {
+        url: 'https://example.com/clip.mp4',
+        gifPlayback: true,
+        ptv: true,
+      }),
+    ).rejects.toThrow('mutuamente excluyentes');
+  });
+
   it('sends an audio message as voice note', async () => {
     const sock = createMockSocket();
     await sendMessage(sock, '5491155551234@s.whatsapp.net', 'audio', {
@@ -118,8 +186,8 @@ describe('sendMessage', () => {
   it('rejects unsupported message types', async () => {
     const sock = createMockSocket();
     await expect(
-      sendMessage(sock, '5491155551234@s.whatsapp.net', 'video', { url: 'https://example.com/v.mp4' }),
-    ).rejects.toThrow('Tipo de mensaje no soportado: video');
+      sendMessage(sock, '5491155551234@s.whatsapp.net', 'sticker', { url: 'https://example.com/s.webp' }),
+    ).rejects.toThrow('Tipo de mensaje no soportado: sticker');
   });
 
   it('rejects text messages without text field', async () => {

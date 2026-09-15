@@ -291,18 +291,20 @@ POST /instances/:name/send
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `to` | string | Yes | Phone number (`5215551234567`) or group JID (`id@g.us`). `@s.whatsapp.net` is appended automatically for individual numbers. |
-| `type` | string | Yes | `text` `image` `audio` `document` |
+| `type` | string | Yes | `text` `image` `video` `audio` `document` |
 | `text` | string | For `text` | Message body |
 | `url` | string | For media | Public URL of the file (HTTP/HTTPS only) |
-| `caption` | string | No | Caption for `image` |
+| `caption` | string | No | Caption for `image` or `video` (not allowed when `ptv` is `true`) |
 | `jpegThumbnail` | string | No | Base64-encoded JPEG (≤ 256KB) used as the inline chat preview for `image`. **Override only** — if you provide all three of `jpegThumbnail`, `width`, and `height`, the server uses your values verbatim. If any is missing, the server auto-generates them (see below). |
 | `width` | integer | No | Image width in pixels for `image` (1–32768). See `jpegThumbnail` for override semantics. |
 | `height` | integer | No | Image height in pixels for `image` (1–32768). See `jpegThumbnail` for override semantics. |
 
 **Auto-generated previews:** if you don't provide `jpegThumbnail` / `width` / `height` (or provide only some of them), the server downloads the image, normalizes it to JPEG with `sharp`, and lets Baileys auto-derive the dimensions and inline thumbnail. This is the default and produces correct previews for any aspect ratio (including vertical 9:16) without any work on the caller's side. Download cap: 16MB, timeout 15s.
 | `filename` | string | No | File name for `document` |
-| `mimetype` | string | No | MIME type for `document` (default: `application/octet-stream`) or `audio` (default: `audio/mpeg`) |
+| `mimetype` | string | No | MIME type for `document` (default: `application/octet-stream`), `audio` (default: `audio/mpeg`) or `video` (default: `video/mp4`) |
 | `ptt` | boolean | No | Send as voice note for `audio` (default: `false`) |
+| `gifPlayback` | boolean | No | Send a `video` as a looping, auto-playing GIF (default: `false`) |
+| `ptv` | boolean | No | Send a `video` as a round video note (default: `false`). Mutually exclusive with `gifPlayback`, and rejects `caption`. |
 
 **`to` format:**
 
@@ -348,6 +350,35 @@ curl -X POST http://localhost:3000/instances/sales/send \
 
 All three fields (`jpegThumbnail`, `width`, `height`) must be present together to take effect. The server validates the thumbnail's magic bytes (`FF D8 FF`) and size (≤ 256KB).
 
+#### Video
+
+```bash
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "5215551234567", "type": "video", "url": "https://example.com/demo.mp4", "caption": "Product demo"}'
+```
+
+**As a GIF** — plays inline on loop, with no audio and no play button:
+
+```bash
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "5215551234567", "type": "video", "url": "https://example.com/loop.mp4", "gifPlayback": true}'
+```
+
+WhatsApp has no real GIF format — a "GIF" is an MP4 with this flag. Send an MP4, not a `.gif` file.
+
+**As a video note (`ptv`)** — the round, circular clip. WhatsApp expects a square video of 60s or less; `caption` is rejected and `gifPlayback` cannot be combined with it:
+
+```bash
+curl -X POST http://localhost:3000/instances/sales/send \
+  -H "x-api-key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "5215551234567", "type": "video", "url": "https://example.com/note.mp4", "ptv": true}'
+```
+
 #### Audio / voice note
 
 ```bash
@@ -374,7 +405,18 @@ curl -X POST http://localhost:3000/instances/sales/send \
 |--------|-------|
 | 400 | Missing `to` / `type`, invalid phone format, unsupported message type |
 | 503 | Instance not connected |
-| 500 | Internal send error |
+| 500 | Internal send error, including a rejected media payload — see below |
+
+Media validation failures come back as `500` with the reason in `error`, since
+they are raised while sending rather than while parsing the body:
+
+| `error` | Cause |
+|---------|-------|
+| `Solo se permiten URLs HTTP/HTTPS` | `url` uses a scheme other than HTTP/HTTPS |
+| `URL de media requerida` | `url` missing on a media type |
+| `gifPlayback y ptv son mutuamente excluyentes` | Both flags sent as `true` |
+| `Un video note (ptv) no admite caption` | `caption` sent alongside `ptv: true` |
+| `gifPlayback debe ser un booleano` / `ptv debe ser un booleano` | Flag sent as a string or number |
 
 ---
 
@@ -595,7 +637,9 @@ POST /instances/:name/newsletters/:jid/send
 ```
 
 Same body as [Send message](#send-message) minus the `to` field (the JID is in
-the path). All four types work — `text`, `image`, `audio`, `document`.
+the path). All five types work — `text`, `image`, `video`, `audio`, `document`
+— including the `gifPlayback` and `ptv` video flags, which are passed through
+unchanged.
 
 ```bash
 curl -X POST "http://localhost:3000/instances/main/newsletters/120363099999999999@newsletter/send" \
@@ -838,6 +882,25 @@ Returns sent message history (stored in embedded SQLite). Filtered by account ow
 ]
 ```
 
+Every send is logged with its `type`, so a video appears as `"type": "video"`
+whether it went out plain, as a GIF or as a video note — the flags are not
+stored separately. A rejected one is logged too, with `status: "error"` and the
+reason in `error`:
+
+```json
+{
+  "id": 42,
+  "instance": "sales",
+  "to": "5215551234567@s.whatsapp.net",
+  "type": "video",
+  "status": "error",
+  "error": "Un video note (ptv) no admite caption",
+  "created_at": "2026-09-15T14:22:00.000Z"
+}
+```
+
+There is no `type` query param — filter client-side on the returned records.
+
 ```bash
 curl "http://localhost:3000/logs?instance=sales&limit=50" \
   -H "x-api-key: your-api-key"
@@ -864,6 +927,36 @@ async function sendWhatsApp(instance, to, text) {
 }
 
 await sendWhatsApp("sales", "5215551234567", "Your order has shipped.");
+```
+
+Sending a video is the same call with a different body. `opts` carries any of
+`caption`, `mimetype`, `gifPlayback` or `ptv`:
+
+```javascript
+async function sendVideo(instance, to, url, opts = {}) {
+  const res = await fetch(`${WAME_URL}/instances/${instance}/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+    body: JSON.stringify({ to, type: "video", url, ...opts }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error);
+  return res.json();
+}
+
+// Plain video with a caption
+await sendVideo("sales", "5215551234567", "https://example.com/demo.mp4", {
+  caption: "Product demo",
+});
+
+// Looping GIF
+await sendVideo("sales", "5215551234567", "https://example.com/loop.mp4", {
+  gifPlayback: true,
+});
+
+// Round video note — square, ≤ 60s, no caption
+await sendVideo("sales", "5215551234567", "https://example.com/note.mp4", {
+  ptv: true,
+});
 ```
 
 ### Python
@@ -962,7 +1055,7 @@ async function registerChannel(instance, invite) {
   return channel.jid;
 }
 
-/** Publish. Same payloads as /send — text, image, audio, document. */
+/** Publish. Same payloads as /send — text, image, video, audio, document. */
 function publish(instance, jid, content) {
   return api(`/instances/${instance}/newsletters/${jid}/send`, {
     method: "POST",

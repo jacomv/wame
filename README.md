@@ -2,7 +2,7 @@
 
 A minimal WhatsApp REST API. It does three things:
 
-1. **Send messages** — text, images, audio, documents
+1. **Send messages** — text, images, video (including GIF and video notes), audio, documents
 2. **Receive events** — via webhooks on incoming messages and group changes
 3. **Multi-tenant accounts** — each user registers, gets their own API key, and manages only their instances
 
@@ -98,7 +98,7 @@ curl -X POST http://localhost:3000/instances/my-number/send \
   -d '{"to": "5215551234567", "type": "text", "text": "Hello from WAME"}'
 ```
 
-Supports `text`, `image`, `audio` (with voice note mode), and `document`.
+Supports `text`, `image`, `video` (with GIF and round video-note modes), `audio` (with voice note mode), and `document`.
 
 ---
 
