@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] — 2026-09-15
+
+Adds video to the send API. Until now the only way to put a video into a chat
+was `type: "document"`, which delivers it as a file attachment: no inline
+preview, no play button, and the recipient has to download it before knowing
+what it is.
+
+### Added
+
+- **`type: "video"` on `POST /instances/:name/send`.** Takes the same `url` as
+  the other media types (HTTP/HTTPS only, validated against `file://` and
+  friends like every other media URL), an optional `caption`, and a `mimetype`
+  defaulting to `video/mp4`.
+
+- **`gifPlayback`.** Sends the video as a looping, auto-playing clip with no
+  audio track and no play button. WhatsApp has no GIF format on the wire — what
+  the app shows as a GIF is an MP4 with this flag set — so the caller must send
+  an MP4, not a `.gif` file. A `.gif` URL arrives as a still or not at all.
+
+- **`ptv`.** Sends the video as a round video note. WhatsApp expects a square
+  clip of 60 seconds or less; a non-square one is centre-cropped by the client.
+  `ptv` and `gifPlayback` are mutually exclusive and rejected together, and
+  `ptv` rejects a `caption` outright, because a video note has nowhere to show
+  one — accepting it silently would drop text the caller believed it had sent.
+
+  No transcoding is done server-side. Unlike `image`, which is downloaded and
+  normalized through `sharp` so Baileys can derive a thumbnail, the video is
+  streamed from its URL and WhatsApp derives the preview from the container —
+  so H.264/AAC in an `.mp4` is what reliably previews on every client.
+
 ## [1.5.0] — 2026-09-10
 
 Makes the sender of a group message identifiable. Until now a webhook consumer
