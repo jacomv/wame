@@ -1,25 +1,20 @@
 import { Router } from 'express';
 import { requireApiKey } from '../auth.js';
 import { validateInstanceName, normalizeJid, validatePhoneOrJid } from '../utils/jid.js';
-import { requireOwnership, sendLimiter } from '../utils/guards.js';
+import { requireOwnership, requireOwnershipOrClaim, sendLimiter } from '../utils/guards.js';
 import { connectInstance, getSocket, getInstanceStatus, disconnectInstance, restartInstance } from '../manager.js';
 import { sendMessage } from '../sender.js';
 import { logMessage } from '../logger.js';
 import { dispatch, listWebhooks } from '../webhooks.js';
-import { assignInstance, getInstanceOwner, removeInstanceOwner } from '../accounts.js';
+import { removeInstanceOwner } from '../accounts.js';
 
 const router = Router();
 
 // ── Conectar / reconectar instancia ────────────────────────────
-router.post('/:name/connect', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
+// Una cuenta reclama el nombre si está libre (ver requireOwnershipOrClaim)
+router.post('/:name/connect', requireApiKey, validateInstanceName, requireOwnershipOrClaim, async (req, res) => {
   try {
     const result = await connectInstance(req.params.name);
-
-    // Asignar ownership si es una cuenta registrada y la instancia no tiene dueño
-    if (req.account && !getInstanceOwner(req.params.name)) {
-      assignInstance(req.params.name, req.account.id);
-    }
-
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -10,6 +10,12 @@ function safeCompare(a, b) {
   return timingSafeEqual(bufA, bufB);
 }
 
+/** ¿Es esta la API key de admin (env API_KEY)? */
+export function isAdminKey(key) {
+  const adminKey = process.env.API_KEY;
+  return Boolean(adminKey) && safeCompare(key, adminKey);
+}
+
 /**
  * Middleware de autenticación.
  * Soporta:
@@ -23,8 +29,7 @@ export function requireApiKey(req, res, next) {
   }
 
   // Check admin key first
-  const adminKey = process.env.API_KEY;
-  if (adminKey && safeCompare(key, adminKey)) {
+  if (isAdminKey(key)) {
     req.account = null;
     req.isAdmin = true;
     return next();

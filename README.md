@@ -30,7 +30,11 @@ Open `http://your-server:3000` — register an account or use the admin API key,
 WAME supports two authentication modes:
 
 - **Admin key** — set `API_KEY` in `.env`. Has access to all instances (backward compatible).
-- **User accounts** — anyone can register via the UI or API and get their own API key. Each user only sees their own instances.
+- **User accounts** — users register via the UI or API and get their own API key. Each user only sees and uses their own instances.
+
+An account owns the instances it creates. An instance with no owner — created with the admin key, or older than the account system — belongs to the admin only; accounts cannot see, use or claim it.
+
+Registration is open by default. On a server reachable from the internet, set `ALLOW_REGISTRATION=false`: the register tab disappears from the UI and only the admin key can create accounts (send it as `x-api-key` on `POST /auth/register`).
 
 ```bash
 # Register a new account via API
@@ -174,7 +178,8 @@ Sessions survive server restarts automatically.
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
 | `GET` | `/health` | No | Health check |
-| `POST` | `/auth/register` | No | Create account, returns API key |
+| `GET` | `/auth/config` | No | Public settings (`registration` open or closed) |
+| `POST` | `/auth/register` | No* | Create account, returns API key (*admin key required if `ALLOW_REGISTRATION=false`) |
 | `POST` | `/auth/login` | No | Login with email/password, returns API key |
 | `GET` | `/status` | Yes | Status of all instances (filtered by account) |
 | `POST` | `/instances/:name/connect` | Yes | Connect / reconnect instance |
@@ -213,6 +218,7 @@ Full examples in [API_DOCS.md](./API_DOCS.md).
 | `RATE_LIMIT` | `100` | Max requests/min (global) |
 | `SEND_RATE_LIMIT` | `30` | Max send requests/min per IP |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin |
+| `ALLOW_REGISTRATION` | `true` | Public account sign-up. Set to `false` so only the admin key can create accounts. |
 | `MSG_CACHE_TTL_HOURS` | `24` | How long a sent message is kept so it can be resent if the recipient fails to decrypt it. Lower it to reduce how long message content stays stored. |
 | `UPDATE_CHECK` | `true` | Check GitHub for new WAME releases and npm for dependency updates. Set to `false` to make the install do no outbound calls. |
 | `NEWSLETTER_INBOUND` | `false` | Deliver channel (newsletter) messages to the `messages` webhook. Off by default: an account usually follows dozens of third-party channels and every post would fire the webhook. Publishing to channels works either way. |

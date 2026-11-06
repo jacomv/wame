@@ -4,6 +4,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
+import { existsSync } from 'fs';
 import { mkdir } from 'fs/promises';
 import path from 'path';
 import pino from 'pino';
@@ -245,6 +246,13 @@ export function getAllStatus() {
     phone: inst.phone,
     connectedAt: inst.connectedAt,
   }));
+}
+
+/** ¿Existe ya esta instancia, en memoria o con sesión guardada (SQLite o disco)? */
+export function instanceExists(name) {
+  if (instances.has(name)) return true;
+  if (listStoredInstances().includes(name)) return true;
+  return existsSync(path.join(SESSION_DIR, name));
 }
 
 export function getInstanceStatus(name) {

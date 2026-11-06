@@ -556,6 +556,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   overlay.addEventListener('click', closeSidebar);
 
+  // Ocultar la pestaña de registro si el servidor lo tiene cerrado
+  fetch('/auth/config').then(r => r.json()).then(cfg => {
+    if (cfg.registration === false) {
+      document.querySelector('.login-tab[data-tab="register"]')?.remove();
+      document.getElementById('tab-register')?.remove();
+    }
+  }).catch(() => {});
+
   // Login tabs
   document.querySelectorAll('.login-tab').forEach(tab => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
