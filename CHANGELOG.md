@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.0] — 2026-11-05
 
 Closes two holes in account isolation.
 
@@ -23,6 +23,13 @@ Closes two holes in account isolation.
   `POST /auth/register` then answers 403 unless it carries the admin key, and
   the UI hides the register tab (it reads the new `GET /auth/config`). The
   default stays `true` so existing installs keep working.
+
+### Fixed
+
+- **Video thumbnails.** The Docker image now ships `ffmpeg`. Baileys shells out
+  to it to grab the first frame of a video as the inline chat thumbnail; without
+  it that call always failed, silently, and videos went out with no preview.
+  Merged after the 1.6.0 tag, so it first ships here.
 
 ### Changed
 
