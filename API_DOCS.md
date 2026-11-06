@@ -80,7 +80,9 @@ See [Channels (newsletters)](#channels-newsletters).
 POST /auth/register
 ```
 
-No authentication required. Creates a new account and returns a unique API key.
+Creates a new account and returns a unique API key. No authentication required
+while registration is open (the default). With `ALLOW_REGISTRATION=false` the
+request must carry the admin key in `x-api-key`.
 
 **Body:**
 
@@ -104,8 +106,25 @@ No authentication required. Creates a new account and returns a unique API key.
 | Status | Cause |
 |--------|-------|
 | 400 | Missing/invalid email or password too short |
+| 403 | Registration closed (`ALLOW_REGISTRATION=false`) and no admin key |
 | 409 | Email already registered |
 | 429 | Rate limit exceeded |
+
+---
+
+### Auth config
+
+```
+GET /auth/config
+```
+
+No authentication required. Tells a client whether public sign-up is open.
+
+**Response `200`:**
+
+```json
+{ "registration": true }
+```
 
 ---
 

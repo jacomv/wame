@@ -2,19 +2,9 @@ import { Router } from 'express';
 import { requireApiKey } from '../auth.js';
 import { validateInstanceName } from '../utils/jid.js';
 import { addWebhook, listWebhooks, removeWebhook, updateWebhook, VALID_EVENTS } from '../webhooks.js';
-import { getInstanceOwner } from '../accounts.js';
+import { requireOwnership } from '../utils/guards.js';
 
 const router = Router();
-
-/** Middleware: verifica ownership de la instancia */
-function requireOwnership(req, res, next) {
-  if (req.isAdmin) return next();
-  const owner = getInstanceOwner(req.params.name);
-  if (owner !== null && owner !== req.account?.id) {
-    return res.status(403).json({ error: 'No tienes acceso a esta instancia' });
-  }
-  next();
-}
 
 // ── Registrar webhook ───────────────────────────────────────────
 router.post('/:name/webhooks', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {

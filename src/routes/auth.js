@@ -1,8 +1,18 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { registerAccount, loginAccount } from '../accounts.js';
+import { isAdminKey } from '../auth.js';
 
 const router = Router();
+
+/**
+ * ¿Se permite el registro público? Con ALLOW_REGISTRATION=false solo el admin
+ * (header x-api-key con la API_KEY) puede crear cuentas. Por omisión sigue
+ * abierto para no romper instalaciones existentes.
+ */
+export function registrationOpen() {
+  return process.env.ALLOW_REGISTRATION !== 'false';
+}
 
 // Rate limiting estricto para auth: 10 req/min por IP
 const authLimiter = rateLimit({
@@ -13,8 +23,17 @@ const authLimiter = rateLimit({
   message: { error: 'Demasiados intentos. Intenta más tarde.' },
 });
 
+// ── Config pública (el panel la lee para mostrar o no la pestaña de registro)
+router.get('/config', (_req, res) => {
+  res.json({ registration: registrationOpen() });
+});
+
 // ── Registro ────────────────────────────────────────────────────
 router.post('/register', authLimiter, (req, res) => {
+  if (!registrationOpen() && !isAdminKey(req.headers['x-api-key'])) {
+    return res.status(403).json({ error: 'El registro está cerrado. Pide una cuenta al administrador.' });
+  }
+
   const { email, password } = req.body;
 
   if (!email || typeof email !== 'string') {

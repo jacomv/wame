@@ -5,6 +5,45 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] — 2026-11-05
+
+Closes two holes in account isolation.
+
+### Security
+
+- **Instances with no owner are admin-only.** Until now any registered account
+  could use an instance with no owner — one created with the admin key, or
+  connected before the account system existed — and send from that number,
+  read its groups, change its webhooks or delete it. Now only the admin key can
+  reach it, and an account can no longer claim it by calling `/connect`.
+  An account still claims a name nobody has used, and it does so before
+  connecting, so two accounts racing on the same new name cannot both get it.
+
+- **`ALLOW_REGISTRATION`.** Set it to `false` to stop public sign-up:
+  `POST /auth/register` then answers 403 unless it carries the admin key, and
+  the UI hides the register tab (it reads the new `GET /auth/config`). The
+  default stays `true` so existing installs keep working.
+
+### Fixed
+
+- **Video thumbnails.** The Docker image now ships `ffmpeg`. Baileys shells out
+  to it to grab the first frame of a video as the inline chat thumbnail; without
+  it that call always failed, silently, and videos went out with no preview.
+  Merged after the 1.6.0 tag, so it first ships here.
+
+### Changed
+
+- The webhook routes used their own copy of the ownership check; they now use
+  the shared one in `src/utils/guards.js`, so all instance routes apply the
+  same rule.
+
+### Upgrading
+
+An account that has been using an instance with no owner loses access to it.
+There is no endpoint to assign an owner; insert the row directly in the
+database (`INSERT INTO instance_owners (instance_name, account_id) VALUES
+('name', <account id>)`), or have the account connect a new instance of its own.
+
 ## [1.6.0] — 2026-09-15
 
 Adds video to the send API. Until now the only way to put a video into a chat
