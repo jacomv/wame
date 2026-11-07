@@ -357,19 +357,12 @@ tr:hover td { background: var(--surface-2); }
 
     <!-- Tabs -->
     <div class="login-tabs">
-      <button class="login-tab active" data-tab="apikey" data-i18n="login.tab.apikey">API Key</button>
-      <button class="login-tab" data-tab="email" data-i18n="login.tab.email">Email</button>
+      <button class="login-tab active" data-tab="email" data-i18n="login.tab.email">Email</button>
       <button class="login-tab" data-tab="register" data-i18n="login.tab.register">Register</button>
     </div>
 
-    <!-- Tab: API Key -->
-    <div class="login-tab-content active" id="tab-apikey">
-      <label class="field-label" data-i18n="login.api_key">API Key</label>
-      <input class="field-input" type="password" id="login-input" data-i18n-ph="login.api_key" placeholder="API Key" autocomplete="off">
-    </div>
-
     <!-- Tab: Email login -->
-    <div class="login-tab-content" id="tab-email">
+    <div class="login-tab-content active" id="tab-email">
       <label class="field-label">Email</label>
       <input class="field-input" type="email" id="login-email" placeholder="email@example.com" autocomplete="email">
       <label class="field-label" data-i18n="login.password">Password</label>
@@ -381,7 +374,7 @@ tr:hover td { background: var(--surface-2); }
       <label class="field-label">Email</label>
       <input class="field-input" type="email" id="reg-email" placeholder="email@example.com" autocomplete="email">
       <label class="field-label" data-i18n="login.password">Password</label>
-      <input class="field-input" type="password" id="reg-password" data-i18n-ph="login.password.min" placeholder="Min 6 characters" autocomplete="new-password">
+      <input class="field-input" type="password" id="reg-password" data-i18n-ph="login.password.min" placeholder="Min 12 characters" autocomplete="new-password">
     </div>
 
     <div class="login-error" id="login-error"></div>
