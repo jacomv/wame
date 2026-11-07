@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'crypto';
 import { findByApiKey } from './accounts.js';
+import { findSession, readSessionCookie } from './panel-sessions.js';
 
 /** Comparación en tiempo constante para evitar timing attacks */
 function safeCompare(a, b) {
@@ -23,9 +24,23 @@ export function isAdminKey(key) {
  * 2. API key de cuenta registrada (DB)     → req.account = { id, email, ... }, req.isAdmin = false
  */
 export function requireApiKey(req, res, next) {
+  // Explicit API credentials take precedence over ambient browser cookies.
   const key = req.headers['x-api-key'];
   if (!key) {
-    return res.status(401).json({ error: 'API key requerida' });
+    const session = findSession(readSessionCookie(req));
+    if (!session) return res.status(401).json({ error: 'Autenticación requerida' });
+
+    // Require same-origin Origin for every cookie-authenticated mutation.
+    // Reject missing Origin, cross-origin forms and opaque origins.
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      const expectedOrigin = `${req.protocol}://${req.get('host')}`;
+      if (req.get('origin') !== expectedOrigin) {
+        return res.status(403).json({ error: 'Origen no permitido' });
+      }
+    }
+    req.account = session;
+    req.isAdmin = false;
+    return next();
   }
 
   // Check admin key first

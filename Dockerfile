@@ -9,6 +9,9 @@ RUN apk add --no-cache python3 make g++ ffmpeg
 
 WORKDIR /app
 
+# production: Express no devuelve stack traces en sus páginas de error.
+ENV NODE_ENV=production
+
 COPY package*.json ./
 RUN npm ci --production
 

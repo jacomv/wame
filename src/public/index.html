@@ -284,6 +284,7 @@ tr:hover td { background: var(--surface-2); }
 .check-item { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; color: var(--text); cursor: pointer; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-2); transition: all 0.1s; }
 .check-item:hover { background: var(--surface-2); border-color: var(--border); }
 .check-item input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.modal-text { font-size: 0.875rem; color: var(--text-2); margin-bottom: 1rem; line-height: 1.5; }
 .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
 
 /* ── Toast ── */
@@ -357,19 +358,12 @@ tr:hover td { background: var(--surface-2); }
 
     <!-- Tabs -->
     <div class="login-tabs">
-      <button class="login-tab active" data-tab="apikey" data-i18n="login.tab.apikey">API Key</button>
-      <button class="login-tab" data-tab="email" data-i18n="login.tab.email">Email</button>
+      <button class="login-tab active" data-tab="email" data-i18n="login.tab.email">Email</button>
       <button class="login-tab" data-tab="register" data-i18n="login.tab.register">Register</button>
     </div>
 
-    <!-- Tab: API Key -->
-    <div class="login-tab-content active" id="tab-apikey">
-      <label class="field-label" data-i18n="login.api_key">API Key</label>
-      <input class="field-input" type="password" id="login-input" data-i18n-ph="login.api_key" placeholder="API Key" autocomplete="off">
-    </div>
-
     <!-- Tab: Email login -->
-    <div class="login-tab-content" id="tab-email">
+    <div class="login-tab-content active" id="tab-email">
       <label class="field-label">Email</label>
       <input class="field-input" type="email" id="login-email" placeholder="email@example.com" autocomplete="email">
       <label class="field-label" data-i18n="login.password">Password</label>
@@ -381,7 +375,7 @@ tr:hover td { background: var(--surface-2); }
       <label class="field-label">Email</label>
       <input class="field-input" type="email" id="reg-email" placeholder="email@example.com" autocomplete="email">
       <label class="field-label" data-i18n="login.password">Password</label>
-      <input class="field-input" type="password" id="reg-password" data-i18n-ph="login.password.min" placeholder="Min 6 characters" autocomplete="new-password">
+      <input class="field-input" type="password" id="reg-password" data-i18n-ph="login.password.min" placeholder="Min 12 characters" autocomplete="new-password">
     </div>
 
     <div class="login-error" id="login-error"></div>
@@ -416,6 +410,9 @@ tr:hover td { background: var(--surface-2); }
       <div class="lang-toggle">
         <button class="lang-btn active" data-lang="en">EN</button>
         <button class="lang-btn" data-lang="es">ES</button>
+      </div>
+      <div style="padding:0.5rem">
+        <button class="btn btn-secondary btn-full" id="btn-rotate-key" type="button" data-i18n="rotate.btn">Rotate API key</button>
       </div>
       <div class="user-row">
         <span class="user-dot"></span>
@@ -551,6 +548,32 @@ tr:hover td { background: var(--surface-2); }
     <div class="modal-actions">
       <button class="btn btn-secondary" id="btn-hook-cancel" data-i18n="btn.cancel">Cancel</button>
       <button class="btn btn-primary" id="btn-hook-create" data-i18n="modal.wh.save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: rotate API key -->
+<div class="modal-overlay hidden" id="modal-rotate">
+  <div class="modal">
+    <div class="modal-title" data-i18n="rotate.title">Rotate API key</div>
+    <div id="rotate-step-password">
+      <p class="modal-text" data-i18n="rotate.warning">The current key will stop working immediately. Update your integrations with the new one.</p>
+      <label for="rotate-password" data-i18n="rotate.password">Confirm your password</label>
+      <input class="modal-input" type="password" id="rotate-password" autocomplete="current-password">
+      <div class="login-error" id="rotate-error"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-rotate-cancel" type="button" data-i18n="btn.cancel">Cancel</button>
+        <button class="btn btn-primary" id="btn-rotate-confirm" type="button" data-i18n="rotate.confirm">Rotate key</button>
+      </div>
+    </div>
+    <div id="rotate-step-key" class="hidden">
+      <p class="modal-text" data-i18n="rotate.copy_now">Copy it now: it will not be shown again.</p>
+      <label for="rotate-new-key" data-i18n="rotate.new_key">New API key</label>
+      <input class="modal-input" type="text" id="rotate-new-key" readonly spellcheck="false">
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-rotate-copy" type="button" data-i18n="rotate.copy">Copy</button>
+        <button class="btn btn-primary" id="btn-rotate-done" type="button" data-i18n="rotate.done">Done</button>
+      </div>
     </div>
   </div>
 </div>

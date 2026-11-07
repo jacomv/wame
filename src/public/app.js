@@ -1,5 +1,4 @@
 // ── State ───────────────────────────────────────────────────────
-let _apiKey       = null;
 let pollTimer     = null;
 let qrStore       = {};
 let webhookStore  = {};
@@ -12,12 +11,12 @@ async function api(method, path, body) {
   const res = await fetch(path, {
     method,
     headers: {
-      'x-api-key': _apiKey,
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
+    credentials: 'same-origin',
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) { doLogout(); throw new Error(t('toast.session.expired')); }
+  if (res.status === 401) { await doLogout(false); throw new Error(t('toast.session.expired')); }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -26,7 +25,7 @@ async function api(method, path, body) {
 }
 
 // ── Auth ────────────────────────────────────────────────────────
-let _activeTab = 'apikey';
+let _activeTab = 'email';
 
 function switchTab(tab) {
   _activeTab = tab;
@@ -43,8 +42,7 @@ function switchTab(tab) {
   }
 }
 
-async function enterApp(apiKey) {
-  _apiKey = apiKey;
+async function enterApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   applyTranslations();
@@ -98,18 +96,7 @@ async function doLogin() {
   err.textContent = '';
 
   try {
-    if (_activeTab === 'apikey') {
-      const key = document.getElementById('login-input').value.trim();
-      if (!key) { err.textContent = t('login.error.invalid'); btn.disabled = false; return; }
-
-      const res = await fetch('/status', { headers: { 'x-api-key': key } });
-      if (res.status === 401) { err.textContent = t('login.error.invalid'); btn.disabled = false; return; }
-      if (res.status === 429) { err.textContent = t('login.error.rate_limit'); btn.disabled = false; return; }
-      if (!res.ok) { err.textContent = t('login.error.server'); btn.disabled = false; return; }
-      document.getElementById('login-input').value = '';
-      await enterApp(key);
-
-    } else if (_activeTab === 'email') {
+    if (_activeTab === 'email') {
       const email = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
       if (!email || !password) { err.textContent = t('login.error.fields'); btn.disabled = false; return; }
@@ -123,13 +110,13 @@ async function doLogin() {
       if (!res.ok) { err.textContent = data.error; btn.disabled = false; return; }
       document.getElementById('login-email').value = '';
       document.getElementById('login-password').value = '';
-      await enterApp(data.apiKey);
+      await enterApp();
 
     } else if (_activeTab === 'register') {
       const email = document.getElementById('reg-email').value.trim();
       const password = document.getElementById('reg-password').value;
       if (!email || !password) { err.textContent = t('login.error.fields'); btn.disabled = false; return; }
-      if (password.length < 6) { err.textContent = t('login.error.password_short'); btn.disabled = false; return; }
+      if (password.length < 12) { err.textContent = t('login.error.password_short'); btn.disabled = false; return; }
 
       const res = await fetch('/auth/register', {
         method: 'POST',
@@ -140,7 +127,7 @@ async function doLogin() {
       if (!res.ok) { err.textContent = data.error; btn.disabled = false; return; }
       document.getElementById('reg-email').value = '';
       document.getElementById('reg-password').value = '';
-      await enterApp(data.apiKey);
+      await enterApp();
     }
   } catch (e) {
     err.textContent = t('login.error.connect') + e.message;
@@ -148,14 +135,15 @@ async function doLogin() {
   btn.disabled = false;
 }
 
-function doLogout() {
-  _apiKey = null;
+async function doLogout(revoke = true) {
+  if (revoke) {
+    try { await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
+  }
   stopPolling();
   instancesData = []; qrStore = {}; webhookStore = {};
   detailName = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('login-input').value = '';
   document.getElementById('login-error').textContent = '';
   showView('instances');
 }
@@ -464,6 +452,62 @@ async function disconnectInstance(name) {
   } catch (e) { toast('err', e.message); }
 }
 
+// ── Rotate API key modal ────────────────────────────────────────
+function openRotateModal() {
+  document.getElementById('rotate-password').value = '';
+  document.getElementById('rotate-error').textContent = '';
+  document.getElementById('rotate-new-key').value = '';
+  document.getElementById('rotate-step-password').classList.remove('hidden');
+  document.getElementById('rotate-step-key').classList.add('hidden');
+  document.getElementById('modal-rotate').classList.remove('hidden');
+  document.getElementById('rotate-password').focus();
+}
+
+// Clears the secret from the DOM when the modal closes.
+function closeRotateModal() {
+  document.getElementById('rotate-password').value = '';
+  document.getElementById('rotate-new-key').value = '';
+  document.getElementById('modal-rotate').classList.add('hidden');
+}
+
+async function rotateApiKey() {
+  const input = document.getElementById('rotate-password');
+  const errorEl = document.getElementById('rotate-error');
+  const btn = document.getElementById('btn-rotate-confirm');
+  if (!input.value) { errorEl.textContent = t('rotate.error.password'); return; }
+  errorEl.textContent = '';
+  btn.disabled = true;
+  try {
+    const response = await fetch('/auth/api-key/rotate', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: input.value }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || t('login.error.server'));
+    input.value = '';
+    document.getElementById('rotate-new-key').value = data.apiKey;
+    document.getElementById('rotate-step-password').classList.add('hidden');
+    document.getElementById('rotate-step-key').classList.remove('hidden');
+    document.getElementById('rotate-new-key').select();
+  } catch (error) {
+    errorEl.textContent = error.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function copyRotatedKey() {
+  const field = document.getElementById('rotate-new-key');
+  try {
+    await navigator.clipboard.writeText(field.value);
+  } catch (_) {
+    field.select();
+    document.execCommand('copy');
+  }
+  toast('ok', t('rotate.copied'));
+}
+
 // ── New instance modal ──────────────────────────────────────────
 function openNewModal() {
   document.getElementById('modal-new').classList.remove('hidden');
@@ -564,6 +608,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }).catch(() => {});
 
+  // Restore a valid HttpOnly session after page refresh.
+  fetch('/auth/session', { credentials: 'same-origin' })
+    .then(r => { if (!r.ok) throw new Error('No active session'); return r.json(); })
+    .then(() => enterApp())
+    .catch(() => {});
+
   // Login tabs
   document.querySelectorAll('.login-tab').forEach(tab => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
@@ -571,12 +621,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Login
   document.getElementById('login-btn').addEventListener('click', doLogin);
-  document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('login-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('reg-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+  // Key rotation requires password re-authentication and reveals the key once.
+  document.getElementById('btn-rotate-key').addEventListener('click', openRotateModal);
+  document.getElementById('btn-rotate-cancel').addEventListener('click', closeRotateModal);
+  document.getElementById('btn-rotate-done').addEventListener('click', closeRotateModal);
+  document.getElementById('btn-rotate-confirm').addEventListener('click', rotateApiKey);
+  document.getElementById('btn-rotate-copy').addEventListener('click', copyRotatedKey);
+  document.getElementById('rotate-password').addEventListener('keydown', e => { if (e.key === 'Enter') rotateApiKey(); });
+
   // Logout
-  document.getElementById('btn-logout').addEventListener('click', doLogout);
+  document.getElementById('btn-logout').addEventListener('click', () => doLogout());
 
   // Sidebar nav
   document.querySelectorAll('.nav-item[data-view]').forEach(btn => {

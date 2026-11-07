@@ -4,7 +4,7 @@ A minimal WhatsApp REST API. It does three things:
 
 1. **Send messages** — text, images, video (including GIF and video notes), audio, documents
 2. **Receive events** — via webhooks on incoming messages and group changes
-3. **Multi-tenant accounts** — each user registers, gets their own API key, and manages only their instances
+3. **Multi-tenant accounts** — each user has an account with its own API key and manages only their instances
 
 That's it. No external services. Embedded SQLite. Deploy and go.
 
@@ -21,7 +21,7 @@ cp .env.example .env   # then edit API_KEY
 docker compose up -d
 ```
 
-Open `http://your-server:3000` — register an account or use the admin API key, scan the QR, start sending.
+Open `http://your-server:3000` — create the first account (sign-up is open only until it exists), scan the QR, start sending.
 
 ---
 
@@ -29,31 +29,40 @@ Open `http://your-server:3000` — register an account or use the admin API key,
 
 WAME supports two authentication modes:
 
-- **Admin key** — set `API_KEY` in `.env`. Has access to all instances (backward compatible).
-- **User accounts** — users register via the UI or API and get their own API key. Each user only sees and uses their own instances.
+- **Admin key** — set `API_KEY` in `.env`. Has access to all instances over the API (`x-api-key`). It does not sign into the web panel.
+- **User accounts** — email and password for the web panel, plus a per-account API key for integrations. Each user only sees and uses their own instances.
 
 An account owns the instances it creates. An instance with no owner — created with the admin key, or older than the account system — belongs to the admin only; accounts cannot see, use or claim it.
 
-Registration is open by default. On a server reachable from the internet, set `ALLOW_REGISTRATION=false`: the register tab disappears from the UI and only the admin key can create accounts (send it as `x-api-key` on `POST /auth/register`).
+### Registration
+
+By default the first account can sign up from the panel, and sign-up closes as soon as it exists. After that only the admin key can create accounts (send it as `x-api-key` on `POST /auth/register`). Set `ALLOW_REGISTRATION=true` to keep public sign-up open, or `false` to close it even for the first account. Passwords need at least 12 characters.
 
 ```bash
-# Register a new account via API
+# Create an account with the admin key (sign-up closed)
 curl -X POST http://localhost:3000/auth/register \
+  -H "x-api-key: your-admin-key" \
   -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "mypassword"}'
+  -d '{"email": "user@example.com", "password": "a-long-password-123"}'
+# → { "ok": true, "email": "user@example.com" }
 ```
 
-Response:
+### Getting an account API key
 
-```json
-{
-  "ok": true,
-  "email": "user@example.com",
-  "apiKey": "wame_a1b2c3d4e5f6..."
-}
+Registration and login do not return the API key. The panel signs in with a 12-hour session cookie, and the account key is issued by **Rotate API key** in the sidebar: confirm the password, copy the key (it is shown once). Rotating again invalidates the previous key immediately.
+
+Without the panel, the same flow works with curl. The rotate call needs the session cookie and an `Origin` header that matches the server:
+
+```bash
+BASE=https://wame.example.com
+curl -c cookie.txt -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "a-long-password-123"}' $BASE/auth/login
+curl -b cookie.txt -H "Origin: $BASE" -H "Content-Type: application/json" \
+  -d '{"password": "a-long-password-123"}' $BASE/auth/api-key/rotate
+# → { "ok": true, "apiKey": "wame_a1b2c3d4e5f6..." }
 ```
 
-Use the returned `apiKey` as `x-api-key` header for all subsequent requests.
+Use that `apiKey` as the `x-api-key` header. Keys are stored only as SHA-256 hashes, so a lost key cannot be recovered — rotate it.
 
 ---
 
@@ -179,8 +188,11 @@ Sessions survive server restarts automatically.
 |--------|-------|------|-------------|
 | `GET` | `/health` | No | Health check |
 | `GET` | `/auth/config` | No | Public settings (`registration` open or closed) |
-| `POST` | `/auth/register` | No* | Create account, returns API key (*admin key required if `ALLOW_REGISTRATION=false`) |
-| `POST` | `/auth/login` | No | Login with email/password, returns API key |
+| `POST` | `/auth/register` | No* | Create account and panel session (*admin key required once sign-up is closed) |
+| `POST` | `/auth/login` | No | Login with email/password, sets the panel session cookie |
+| `GET` | `/auth/session` | Cookie | Current panel session |
+| `POST` | `/auth/logout` | Cookie | Revoke the panel session |
+| `POST` | `/auth/api-key/rotate` | Cookie + password | Issue a new account API key (shown once) |
 | `GET` | `/status` | Yes | Status of all instances (filtered by account) |
 | `POST` | `/instances/:name/connect` | Yes | Connect / reconnect instance |
 | `GET` | `/instances/:name/status` | Yes | Instance status + QR code |
@@ -218,7 +230,8 @@ Full examples in [API_DOCS.md](./API_DOCS.md).
 | `RATE_LIMIT` | `100` | Max requests/min (global) |
 | `SEND_RATE_LIMIT` | `30` | Max send requests/min per IP |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin |
-| `ALLOW_REGISTRATION` | `true` | Public account sign-up. Set to `false` so only the admin key can create accounts. |
+| `ALLOW_REGISTRATION` | — | Unset: the first account signs up, then sign-up closes. `true`: always open. `false`: closed, even for the first account (create it with the admin key). |
+| `TRUST_PROXY` | `1` | Proxies trusted for `X-Forwarded-*` (Express `trust proxy`). Keep `1` behind Traefik/Nginx; set `false` if the port is exposed directly, otherwise clients can spoof their IP. |
 | `MSG_CACHE_TTL_HOURS` | `24` | How long a sent message is kept so it can be resent if the recipient fails to decrypt it. Lower it to reduce how long message content stays stored. |
 | `UPDATE_CHECK` | `true` | Check GitHub for new WAME releases and npm for dependency updates. Set to `false` to make the install do no outbound calls. |
 | `NEWSLETTER_INBOUND` | `false` | Deliver channel (newsletter) messages to the `messages` webhook. Off by default: an account usually follows dozens of third-party channels and every post would fire the webhook. Publishing to channels works either way. |
@@ -251,9 +264,12 @@ docker compose logs --since 1h | grep '\[retry\]'
 
 - Multi-tenant isolation (each account only accesses its own instances)
 - Passwords hashed with scrypt (Node.js native crypto)
-- Timing-safe API key comparison (prevents timing attacks)
+- API keys stored as SHA-256 hashes, rotated with password confirmation
+- Web panel uses an HttpOnly, SameSite=Strict session cookie (12 h, revocable); cookie-authenticated writes require a same-origin `Origin` header
+- Timing-safe admin key comparison (prevents timing attacks)
 - Helmet security headers
-- Rate limiting on all routes (stricter on auth endpoints)
+- Rate limiting on all routes (stricter on auth endpoints, plus a per-account lockout after 10 failed logins in 15 minutes)
+- JSON error responses without stack traces
 - Input validation and phone number normalization
 - SSRF protection on media URLs (only `http://` and `https://` allowed)
 - Instance name validation (alphanumeric + `-_`) prevents path traversal
