@@ -9,10 +9,10 @@ const router = Router();
 /**
  * ¿Se permite el registro público? Con ALLOW_REGISTRATION=false solo el admin
  * (header x-api-key con la API_KEY) puede crear cuentas. Por omisión sigue
- * abierto para no romper instalaciones existentes.
+ * cerrado por seguridad. Habilitarlo explícitamente solo si se requiere.
  */
 export function registrationOpen() {
-  return process.env.ALLOW_REGISTRATION !== 'false';
+  return process.env.ALLOW_REGISTRATION === 'true';
 }
 
 // Rate limiting estricto para auth: 10 req/min por IP
