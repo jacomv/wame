@@ -129,7 +129,7 @@ async function doLogin() {
       const email = document.getElementById('reg-email').value.trim();
       const password = document.getElementById('reg-password').value;
       if (!email || !password) { err.textContent = t('login.error.fields'); btn.disabled = false; return; }
-      if (password.length < 6) { err.textContent = t('login.error.password_short'); btn.disabled = false; return; }
+      if (password.length < 12) { err.textContent = t('login.error.password_short'); btn.disabled = false; return; }
 
       const res = await fetch('/auth/register', {
         method: 'POST',
