@@ -65,6 +65,19 @@ describe('HTTP browser authentication lifecycle', () => {
     expect((await fetch(base + '/auth/session', { headers: { Cookie: cookie } })).status).toBe(401);
   });
 
+  it('rotates API keys only with a session and correct password', async () => {
+    const login = await post('/auth/login', { email: 'first@example.test', password: 'test-password-12345' });
+    const cookie = cookieFrom(login);
+    expect((await post('/auth/api-key/rotate', { password: 'test-password-12345' })).status).toBe(401);
+    expect((await post('/auth/api-key/rotate', { password: 'wrong' }, cookie)).status).toBe(401);
+    expect((await post('/auth/api-key/rotate', { password: 'test-password-12345' }, cookie, { Origin: 'https://evil.test' })).status).toBe(403);
+    const rotated = await post('/auth/api-key/rotate', { password: 'test-password-12345' }, cookie);
+    expect(rotated.status).toBe(200);
+    const { apiKey } = await rotated.json();
+    expect(apiKey).toMatch(/^wame_/);
+    expect((await fetch(base + '/private', { headers: { 'x-api-key': apiKey } })).status).toBe(200);
+  });
+
   it('rejects malformed login and incorrect credentials', async () => {
     expect((await post('/auth/login', { email: {}, password: [] })).status).toBe(400);
     expect((await post('/auth/login', { email: 'first@example.test', password: 'incorrect' })).status).toBe(401);
