@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import db from '../db.js';
 import rateLimit from 'express-rate-limit';
 import { registerAccount, loginAccount, rotateApiKey } from '../accounts.js';
 import { isAdminKey } from '../auth.js';
@@ -12,7 +13,7 @@ const router = Router();
  * cerrado por seguridad. Habilitarlo explícitamente solo si se requiere.
  */
 export function registrationOpen() {
-  return process.env.ALLOW_REGISTRATION === 'true';
+  return process.env.ALLOW_REGISTRATION === 'true' || !db.prepare('SELECT 1 FROM accounts LIMIT 1').get();
 }
 
 // Rate limiting estricto para auth: 10 req/min por IP
