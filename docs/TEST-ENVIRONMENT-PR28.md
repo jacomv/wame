@@ -51,9 +51,10 @@ Marca cada prueba solo después de comprobarla.
 - [ ] **Autorización:** sin sesión ni API key, `GET /status` devuelve 401.
 - [ ] **CSRF:** un POST autenticado solo con cookie y `Origin` ajeno devuelve 403. También se rechaza cuando falta `Origin`.
 - [ ] **API key de integración:** la API key de administrador de pruebas sigue autenticando con `x-api-key` sin cookie.
-- [ ] **Rotación:** con sesión válida, botón **Rotate API key**; contraseña errónea falla, contraseña correcta muestra una clave una sola vez. La clave anterior de la cuenta deja de funcionar. No rotar la clave global `WAME_TEST_API_KEY` (es distinta).
+- [ ] **Rotación:** con sesión válida, botón **Rotate API key** abre un modal con contraseña enmascarada; contraseña errónea muestra el error en el modal, contraseña correcta muestra una clave una sola vez con botón **Copiar**. La clave anterior de la cuenta deja de funcionar. No rotar la clave global `WAME_TEST_API_KEY` (es distinta).
 - [ ] **Instancias:** una cuenta no puede ver, modificar ni reclamar una instancia existente de otra cuenta o sin propietario. Usar instancias ficticias; **no conectar WhatsApp real**.
-- [ ] **Resistencia:** entradas malformadas en login y registro devuelven 400, sin errores 500 ni caída del servidor.
+- [ ] **Resistencia:** entradas malformadas en login y registro devuelven 400, sin errores 500 ni caída del servidor. Un JSON roto devuelve `{"error":"JSON inválido"}` sin stack trace.
+- [ ] **Fuerza bruta por cuenta:** 10 logins fallidos para el mismo email en 15 minutos devuelven 429 aunque cambie la IP o el `X-Forwarded-For`.
 - [ ] **Persistencia:** reiniciar el contenedor conserva las cuentas en el volumen de pruebas.
 - [ ] **Logs:** no aparecen contraseñas, claves API completas ni tokens de sesión en logs del servidor.
 
