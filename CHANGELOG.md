@@ -5,6 +5,46 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **MCP server for AI assistants** (`MCP_ENABLED=true`, `PUBLIC_URL`). A remote
+  MCP server over Streamable HTTP at `/mcp`, so Claude, ChatGPT and other
+  agents can use WhatsApp without receiving a permanent API key.
+  - OAuth 2.1 with Authorization Code + PKCE (S256), dynamic client
+    registration, authorization-server and protected-resource metadata,
+    resource indicators, `iss` on the redirect and token revocation.
+    Access tokens last 1 hour; refresh tokens rotate, and reusing one revokes
+    the whole authorization.
+  - Consent screen: the user signs in with their Wame account, sees which
+    client asks, and chooses the instances and permissions it gets.
+    `messages:send` is never preselected.
+  - Per-instance permissions (`instances:read`, `messages:send`,
+    `messages:read`, `groups:read`, `contacts:read`, `webhooks:read`), checked
+    on every call together with instance ownership. Reducing or revoking an
+    authorization takes effect on the next request.
+  - Tools: `list_instances`, `get_instance_status`, `send_text`, `send_media`,
+    `list_groups`, `get_group_participants`, `check_whatsapp_number`,
+    `list_message_logs`, `list_webhooks`. No administrative tools; the QR
+    code is never exposed; channels cannot be published to.
+  - `send_media` only fetches public URLs (private, loopback, link-local and
+    metadata addresses blocked, each redirect validated) and checks size and
+    content type first.
+  - **Connected apps** in the panel: client, instances, permissions, last use
+    and last action, with immediate revocation.
+  - Client secrets, codes and tokens are stored only as SHA-256 hashes.
+    Authorization events and tool calls are audited without message content,
+    recipients or secrets.
+  - Isolated test environment (`docker-compose.mcp-test.yml`) and an end-to-end
+    script with a real MCP client (`scripts/mcp-e2e.mjs`).
+
+### Changed
+
+- Sending, status, groups and number checks moved to `src/services/instances.js`,
+  shared by the REST routes and the MCP tools. REST responses are unchanged.
+- Deleting an instance also removes it from every MCP authorization.
+
 ## [1.8.0] — 2026-11-07
 
 Hardens authentication: the web panel moves to revocable session cookies, API
