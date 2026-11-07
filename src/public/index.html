@@ -227,6 +227,21 @@ body {
 .qr-wrap img { width: 160px; height: 160px; border-radius: 4px; background: #fff; padding: 4px; }
 .qr-hint { font-size: 0.75rem; color: var(--text-3); }
 
+/* ── Connected apps ── */
+.apps-intro { color: var(--text-2); font-size: 0.875rem; margin-bottom: 1rem; }
+#apps-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+.app-card { background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius); padding: 1.25rem; }
+.app-name { font-size: 1rem; font-weight: 600; }
+.app-host { font-family: var(--mono); font-size: 0.75rem; color: var(--text-3); margin-top: 0.15rem; word-break: break-all; }
+.app-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: 0.9rem 0 0.35rem; font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chip { font-family: var(--mono); font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 99px; background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border-2); }
+.chip.send { color: var(--red); background: var(--red-dim); border-color: rgba(239,68,68,0.25); }
+.chip.gone { color: var(--yellow); background: var(--yellow-dim); border-color: rgba(245,158,11,0.25); text-decoration: line-through; }
+.app-meta { font-size: 0.8125rem; color: var(--text-2); margin-top: 0.9rem; line-height: 1.6; }
+.app-meta .err { color: var(--red); } .app-meta .ok { color: var(--accent); }
+.app-footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
+
 .empty-state { grid-column: 1/-1; text-align: center; padding: 4rem 1rem; color: var(--text-3); }
 .empty-state-icon { font-size: 2rem; margin-bottom: 0.75rem; }
 .empty-state p { font-size: 0.9375rem; }
@@ -397,6 +412,10 @@ tr:hover td { background: var(--surface-2); }
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         <span data-i18n="nav.logs">Logs</span>
       </button>
+      <button class="nav-item hidden" data-view="apps" id="nav-apps">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span data-i18n="nav.apps">Connected apps</span>
+      </button>
     </nav>
     <div class="sidebar-footer">
       <a id="update-banner" class="update-banner hidden" target="_blank" rel="noopener noreferrer">
@@ -491,6 +510,33 @@ tr:hover td { background: var(--surface-2); }
       </div>
     </div>
 
+    <!-- Connected apps (MCP) -->
+    <div id="view-apps" class="view">
+      <div class="page-header">
+        <div class="page-title" data-i18n="apps.title">Connected apps</div>
+        <button class="btn btn-secondary" id="btn-refresh-apps">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          <span data-i18n="btn.refresh">Refresh</span>
+        </button>
+      </div>
+      <div class="page-content">
+        <p class="apps-intro" data-i18n="apps.intro">AI assistants (MCP clients) you authorized to use your instances. Revoking takes effect immediately.</p>
+        <div id="apps-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: revoke connected app -->
+<div class="modal-overlay hidden" id="modal-revoke">
+  <div class="modal">
+    <div class="modal-title" data-i18n="apps.revoke.title">Revoke access</div>
+    <p class="modal-text"><span data-i18n="apps.revoke.text">This application will immediately lose access to your instances:</span> <strong id="revoke-app-name"></strong></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-revoke-cancel" type="button" data-i18n="btn.cancel">Cancel</button>
+      <button class="btn btn-danger" id="btn-revoke-confirm" type="button" data-i18n="apps.revoke.confirm">Revoke</button>
+    </div>
   </div>
 </div>
 
