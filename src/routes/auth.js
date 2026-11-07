@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { registerAccount, loginAccount } from '../accounts.js';
+import { registerAccount, loginAccount, rotateApiKey } from '../accounts.js';
 import { isAdminKey } from '../auth.js';
 import { createSession, findSession, revokeSession, sessionCookie, clearSessionCookie, readSessionCookie } from '../panel-sessions.js';
 
@@ -35,7 +35,7 @@ router.post('/register', authLimiter, (req, res) => {
     return res.status(403).json({ error: 'El registro está cerrado. Pide una cuenta al administrador.' });
   }
 
-  const { email, password } = req.body;
+  const { email, password } = req.body || {}
 
   if (!email || typeof email !== 'string') {
     return res.status(400).json({ error: 'Campo "email" requerido' });
@@ -51,8 +51,7 @@ router.post('/register', authLimiter, (req, res) => {
 
   try {
     const result = registerAccount(email.trim().toLowerCase(), password);
-    const account = loginAccount(email.trim().toLowerCase(), password);
-    const { token } = createSession(account.id);
+    const { token } = createSession(result.id);
     res.setHeader('Set-Cookie', sessionCookie(token, req.secure));
     res.status(201).json({ ok: true, email: result.email });
   } catch (err) {
@@ -79,6 +78,22 @@ router.post('/login', authLimiter, (req, res) => {
   const { token } = createSession(account.id);
   res.setHeader('Set-Cookie', sessionCookie(token, req.secure));
   res.json({ ok: true, email: account.email });
+});
+
+// Rotate the permanent integration credential only after password re-authentication.
+// Old key becomes invalid immediately; new key is revealed exactly once.
+router.post('/api-key/rotate', authLimiter, (req, res) => {
+  const session = findSession(readSessionCookie(req));
+  if (!session) return res.status(401).json({ error: 'Sesión requerida' });
+  const expectedOrigin = `${req.protocol}://${req.get('host')}`;
+  if (req.get('origin') !== expectedOrigin) return res.status(403).json({ error: 'Origen no permitido' });
+  const password = req.body?.password;
+  if (typeof password !== 'string' || !loginAccount(session.email, password)) {
+    return res.status(401).json({ error: 'Contraseña incorrecta' });
+  }
+  const apiKey = rotateApiKey(session.id);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, apiKey });
 });
 
 router.get('/session', (req, res) => {
