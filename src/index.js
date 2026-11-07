@@ -11,6 +11,8 @@ import { getAllStatus, restoreExistingSessions, shutdown } from './manager.js';
 import { getOwnedInstances } from './accounts.js';
 import { checkUpdates } from './updater.js';
 import { trustProxySetting, jsonErrorHandler } from './utils/http.js';
+import { loadMcpConfig } from './mcp/config.js';
+import { mountMcp } from './mcp/index.js';
 import authRoutes from './routes/auth.js';
 import instanceRoutes from './routes/instances.js';
 import newsletterRoutes from './routes/newsletters.js';
@@ -35,6 +37,10 @@ app.use(helmet({
     },
   },
 }));
+// MCP (opcional): OAuth y /mcp llevan su propio CORS y rate limit, por eso van antes.
+const mcpConfig = loadMcpConfig();
+if (mcpConfig.enabled) mountMcp(app, mcpConfig);
+
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '5mb' }));
 

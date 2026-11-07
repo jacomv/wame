@@ -51,7 +51,7 @@ const rotateAccountLimiter = accountLimit(req => {
 
 // ── Config pública (el panel la lee para mostrar o no la pestaña de registro)
 router.get('/config', (_req, res) => {
-  res.json({ registration: registrationOpen() });
+  res.json({ registration: registrationOpen(), mcp: process.env.MCP_ENABLED === 'true' });
 });
 
 // ── Registro ────────────────────────────────────────────────────

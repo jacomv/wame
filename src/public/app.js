@@ -48,6 +48,10 @@ async function enterApp() {
   applyTranslations();
   startPolling();
   loadVersion();
+  // La sección solo existe si el servidor tiene MCP activado.
+  fetch('/auth/config').then(r => r.json()).then(cfg => {
+    document.getElementById('nav-apps').classList.toggle('hidden', !cfg.mcp);
+  }).catch(() => {});
 }
 
 // ── Versión y actualizaciones ───────────────────────────────────
@@ -555,6 +559,69 @@ async function fetchLogs() {
   } catch (_) {}
 }
 
+// ── Connected apps (MCP) ────────────────────────────────────────
+let revokeTarget = null;
+
+async function fetchApps() {
+  const list = document.getElementById('apps-list');
+  try {
+    const { apps } = await api('GET', '/auth/connected-apps');
+    if (!apps.length) {
+      list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔌</div><p>${t('apps.empty')}</p></div>`;
+      return;
+    }
+    list.innerHTML = apps.map(app => {
+      const hosts = [app.client.clientUri, ...app.client.redirectHosts].filter(Boolean);
+      const last = app.lastActivity
+        ? `<div>${t('apps.last_action')}: <span class="${app.lastActivity.outcome === 'ok' ? 'ok' : 'err'}">${escHtml(app.lastActivity.tool || '')}</span>${app.lastActivity.instance ? ' · ' + escHtml(app.lastActivity.instance) : ''}</div>`
+        : '';
+      return `<div class="app-card">
+        <div class="app-name">${escHtml(app.client.name)}</div>
+        <div class="app-host">${escHtml(hosts.join(' · ') || app.client.clientId)}</div>
+        <div class="app-label">${t('apps.instances')}</div>
+        <div class="chips">${app.instances.map(i =>
+          `<span class="chip${i.owned ? '' : ' gone'}" title="${i.owned ? '' : escHtml(t('apps.instance_gone'))}">${escHtml(i.name)}</span>`).join('')}</div>
+        <div class="app-label">${t('apps.scopes')}</div>
+        <div class="chips">${app.scopes.map(s =>
+          `<span class="chip${s.name === 'messages:send' ? ' send' : ''}" title="${escHtml(s[getLang()] || s.en)}">${escHtml(s.name)}</span>`).join('')}</div>
+        <div class="app-meta">
+          <div>${t('apps.authorized')}: ${fmtDate(app.createdAt)}</div>
+          <div>${t('apps.last_used')}: ${app.lastUsedAt ? fmtDate(app.lastUsedAt) : t('apps.never')}</div>
+          ${last}
+        </div>
+        <div class="app-footer">
+          <button class="btn btn-danger" data-revoke="${app.id}" data-name="${escHtml(app.client.name)}">${t('apps.revoke')}</button>
+        </div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('[data-revoke]').forEach(btn => btn.addEventListener('click', () => openRevokeModal(btn.dataset.revoke, btn.dataset.name)));
+  } catch (e) { toast('err', e.message); }
+}
+
+function openRevokeModal(id, name) {
+  revokeTarget = id;
+  document.getElementById('revoke-app-name').textContent = name;
+  document.getElementById('modal-revoke').classList.remove('hidden');
+}
+
+function closeRevokeModal() {
+  revokeTarget = null;
+  document.getElementById('modal-revoke').classList.add('hidden');
+}
+
+async function confirmRevoke() {
+  if (!revokeTarget) return;
+  const btn = document.getElementById('btn-revoke-confirm');
+  btn.disabled = true;
+  try {
+    await api('DELETE', `/auth/connected-apps/${encodeURIComponent(revokeTarget)}`);
+    toast('ok', t('apps.revoked'));
+    closeRevokeModal();
+    fetchApps();
+  } catch (e) { toast('err', e.message); }
+  finally { btn.disabled = false; }
+}
+
 // ── Toast ────────────────────────────────────────────────────────
 let toastTimer;
 function toast(type, msg) {
@@ -639,6 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.dataset.view === 'logs') fetchLogs();
+      if (btn.dataset.view === 'apps') fetchApps();
       showView(btn.dataset.view);
       closeSidebar();
     });
@@ -666,6 +734,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Refresh logs
   document.getElementById('btn-refresh-logs').addEventListener('click', fetchLogs);
+  document.getElementById('btn-refresh-apps').addEventListener('click', fetchApps);
+  document.getElementById('btn-revoke-cancel').addEventListener('click', closeRevokeModal);
+  document.getElementById('btn-revoke-confirm').addEventListener('click', confirmRevoke);
 
   // Delegated clicks
   document.getElementById('main').addEventListener('click', e => {

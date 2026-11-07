@@ -20,7 +20,25 @@ const TRANSLATIONS = {
     // Sidebar / nav
     'nav.instances':           'Instances',
     'nav.logs':                'Logs',
+    'nav.apps':                'Connected apps',
     'sidebar.authenticated':   'Authenticated',
+
+    // Connected apps (MCP)
+    'apps.title':              'Connected apps',
+    'apps.intro':              'AI assistants (MCP clients) you authorized to use your instances. Revoking takes effect immediately.',
+    'apps.empty':              'No connected apps. Add Wame as an MCP server in Claude, ChatGPT or another client to authorize one.',
+    'apps.instances':          'Instances',
+    'apps.scopes':             'Permissions',
+    'apps.authorized':         'Authorized',
+    'apps.last_used':          'Last used',
+    'apps.never':              'never',
+    'apps.last_action':        'Last action',
+    'apps.revoke':             'Revoke',
+    'apps.revoke.title':       'Revoke access',
+    'apps.revoke.text':        'This application will immediately lose access to your instances:',
+    'apps.revoke.confirm':     'Revoke',
+    'apps.revoked':            'Access revoked',
+    'apps.instance_gone':      'no longer yours',
 
     // API key rotation
     'rotate.btn':              'Rotate API key',
@@ -143,7 +161,24 @@ const TRANSLATIONS = {
 
     'nav.instances':           'Instancias',
     'nav.logs':                'Logs',
+    'nav.apps':                'Aplicaciones conectadas',
     'sidebar.authenticated':   'Autenticado',
+
+    'apps.title':              'Aplicaciones conectadas',
+    'apps.intro':              'Asistentes de IA (clientes MCP) que autorizaste para usar tus instancias. Revocar tiene efecto inmediato.',
+    'apps.empty':              'No hay aplicaciones conectadas. Agrega Wame como servidor MCP en Claude, ChatGPT u otro cliente para autorizar una.',
+    'apps.instances':          'Instancias',
+    'apps.scopes':             'Permisos',
+    'apps.authorized':         'Autorizada',
+    'apps.last_used':          'Último uso',
+    'apps.never':              'nunca',
+    'apps.last_action':        'Última acción',
+    'apps.revoke':             'Revocar',
+    'apps.revoke.title':       'Revocar acceso',
+    'apps.revoke.text':        'Esta aplicación perderá de inmediato el acceso a tus instancias:',
+    'apps.revoke.confirm':     'Revocar',
+    'apps.revoked':            'Acceso revocado',
+    'apps.instance_gone':      'ya no es tuya',
 
     'rotate.btn':              'Rotar API key',
     'rotate.title':            'Rotar API key',

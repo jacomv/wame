@@ -66,6 +66,19 @@ Use that `apiKey` as the `x-api-key` header. Keys are stored only as SHA-256 has
 
 ---
 
+## MCP server (AI assistants)
+
+WAME can run as a remote **MCP server** so Claude, ChatGPT and other agents can use WhatsApp through OAuth 2.1, without ever receiving a permanent API key. Each user approves a client on a consent screen, picks which of their instances it may use and which permissions it gets (`instances:read`, `messages:send`, `messages:read`, `groups:read`, `contacts:read`, `webhooks:read`), and can revoke it from **Connected apps** in the panel.
+
+```bash
+MCP_ENABLED=true
+PUBLIC_URL=https://wame.example.com   # clients connect to https://wame.example.com/mcp
+```
+
+It is off by default. Setup, tools, security model and client configuration: [docs/MCP.md](./docs/MCP.md).
+
+---
+
 ## Docker Compose
 
 ```yaml
@@ -231,6 +244,8 @@ Full examples in [API_DOCS.md](./API_DOCS.md).
 | `SEND_RATE_LIMIT` | `30` | Max send requests/min per IP |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin |
 | `ALLOW_REGISTRATION` | — | Unset: the first account signs up, then sign-up closes. `true`: always open. `false`: closed, even for the first account (create it with the admin key). |
+| `MCP_ENABLED` | `false` | Enables the MCP server (OAuth 2.1 + `/mcp`). See [docs/MCP.md](./docs/MCP.md). |
+| `PUBLIC_URL` | — | Public URL of this server; required with `MCP_ENABLED=true` (OAuth issuer, token audience `<PUBLIC_URL>/mcp`). |
 | `TRUST_PROXY` | `1` | Proxies trusted for `X-Forwarded-*` (Express `trust proxy`). Keep `1` behind Traefik/Nginx; set `false` if the port is exposed directly, otherwise clients can spoof their IP. |
 | `MSG_CACHE_TTL_HOURS` | `24` | How long a sent message is kept so it can be resent if the recipient fails to decrypt it. Lower it to reduce how long message content stays stored. |
 | `UPDATE_CHECK` | `true` | Check GitHub for new WAME releases and npm for dependency updates. Set to `false` to make the install do no outbound calls. |

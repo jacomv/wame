@@ -1,0 +1,27 @@
+# Entorno aislado para probar el servidor MCP con OAuth.
+# Arranque: WAME_TEST_API_KEY="$(openssl rand -hex 32)" docker compose -f docker-compose.mcp-test.yml up --build -d
+# Solo escucha en localhost. Nunca reutilizar credenciales, volúmenes ni sesiones de producción.
+services:
+  wame-mcp-test:
+    build: .
+    restart: "no"
+    ports:
+      - "127.0.0.1:3200:3000"
+    environment:
+      API_KEY: ${WAME_TEST_API_KEY:?Set WAME_TEST_API_KEY to a random test-only secret}
+      PORT: "3000"
+      DATA_DIR: /data
+      SESSION_DIR: /data/sessions
+      WEBHOOKS_DIR: /data/webhooks
+      CORS_ORIGIN: http://localhost:3200
+      UPDATE_CHECK: "false"
+      MCP_ENABLED: "true"
+      # Debe coincidir con la URL con la que el cliente MCP llega al servidor.
+      PUBLIC_URL: http://localhost:3200
+    volumes:
+      - wame_mcp_test_data:/data
+    stop_grace_period: 30s
+
+volumes:
+  wame_mcp_test_data:
+    name: wame_mcp_test_data

@@ -2,13 +2,17 @@ import { Router } from 'express';
 import { requireApiKey } from '../auth.js';
 import { validateInstanceName, normalizeJid, validatePhoneOrJid } from '../utils/jid.js';
 import { requireOwnership, requireOwnershipOrClaim, sendLimiter } from '../utils/guards.js';
-import { connectInstance, getSocket, getInstanceStatus, disconnectInstance, restartInstance } from '../manager.js';
-import { sendMessage } from '../sender.js';
-import { logMessage } from '../logger.js';
+import { connectInstance, getSocket, disconnectInstance, restartInstance } from '../manager.js';
+import { ServiceError, instanceStatus, sendToInstance, listGroups, listGroupParticipants, checkNumber } from '../services/instances.js';
 import { dispatch, listWebhooks } from '../webhooks.js';
 import { removeInstanceOwner } from '../accounts.js';
 
 const router = Router();
+
+/** Responde un error de la capa de servicios con su código HTTP. */
+function sendServiceError(res, err) {
+  res.status(err instanceof ServiceError ? err.status : 500).json({ error: err.message });
+}
 
 // ── Conectar / reconectar instancia ────────────────────────────
 // Una cuenta reclama el nombre si está libre (ver requireOwnershipOrClaim)
@@ -23,118 +27,49 @@ router.post('/:name/connect', requireApiKey, validateInstanceName, requireOwners
 
 // ── Estado de una instancia (incluye QR si está pendiente) ─────
 router.get('/:name/status', requireApiKey, validateInstanceName, requireOwnership, (req, res) => {
-  const inst = getInstanceStatus(req.params.name);
-  if (!inst) return res.status(404).json({ error: 'Instancia no encontrada' });
-  res.json(inst);
+  try {
+    res.json(instanceStatus(req.params.name));
+  } catch (err) {
+    sendServiceError(res, err);
+  }
 });
 
 // ── Enviar mensaje ──────────────────────────────────────────────
 router.post('/:name/send', requireApiKey, validateInstanceName, requireOwnership, sendLimiter, async (req, res) => {
-  const { name } = req.params;
-  const { to, type, ...payload } = req.body;
-
-  if (!to || !type) {
-    return res.status(400).json({ error: 'Faltan campos: to, type' });
-  }
-
-  // allowNewsletter: publicar en un canal es el mismo sendMessage, solo cambia
-  // el JID (…@newsletter). Baileys detecta el servidor y usa la rama de canal.
-  if (!validatePhoneOrJid(to, { allowNewsletter: true })) {
-    return res.status(400).json({ error: 'Formato de número/JID inválido' });
-  }
-
-  const jid = normalizeJid(to);
-  const sock = getSocket(name);
-  if (!sock) {
-    return res.status(503).json({ error: `Instancia "${name}" no conectada` });
-  }
-
   try {
-    await sendMessage(sock, jid, type, payload);
-    await logMessage({ instance: name, to: jid, type, status: 'ok' });
+    await sendToInstance(req.params.name, req.body || {});
     res.json({ ok: true });
   } catch (err) {
-    await logMessage({ instance: name, to: jid, type, status: 'error', error: err.message });
-    res.status(500).json({ error: err.message });
+    sendServiceError(res, err);
   }
 });
 
 // ── Listar grupos de una instancia ─────────────────────────────
 router.get('/:name/groups', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
-  const sock = getSocket(req.params.name);
-  if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
   try {
-    const groups = await sock.groupFetchAllParticipating();
-    const list = Object.values(groups).map(g => ({
-      id: g.id,
-      name: g.subject,
-      participants: g.participants?.length ?? 0,
-    }));
-    res.json(list);
+    res.json(await listGroups(req.params.name));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServiceError(res, err);
   }
 });
 
 // ── Participantes de un grupo ───────────────────────────────────
 router.get('/:name/groups/:groupId/participants', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
-  const sock = getSocket(req.params.name);
-  if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
   try {
-    const meta = await sock.groupMetadata(req.params.groupId);
-    const list = meta.participants.map(p => ({
-      id: p.id,
-      phone: p.id.replace('@s.whatsapp.net', '').replace('@c.us', '').split(':')[0],
-      admin: p.admin ?? null,
-    }));
-    res.json(list);
+    res.json(await listGroupParticipants(req.params.name, req.params.groupId));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServiceError(res, err);
   }
 });
 
 // ── Verificar si un número está en WhatsApp ─────────────────────
 router.post('/:name/check-number', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
-  const { number } = req.body;
-  if (!number) return res.status(400).json({ error: 'Campo "number" requerido' });
-
-  if (!validatePhoneOrJid(number)) {
-    return res.status(400).json({ error: 'Formato de número inválido' });
-  }
-
-  const sock = getSocket(req.params.name);
-  if (!sock) return res.status(503).json({ error: 'Instancia no conectada' });
-
   try {
-    const jid = normalizeJid(number);
-    const [result] = await sock.onWhatsApp(jid);
-    res.json({
-      exists: !!result?.exists,
-      jid: result?.jid ?? null,
-      // Identidad LID del contacto, o null si no tiene o no se conoce todavía.
-      // Se lee de dos sitios porque cambió de lugar: 6.7.x la incluía en la
-      // respuesta de onWhatsApp(), y 7.x ya no —ahora vive en el
-      // LIDMappingStore del signalRepository, que es quien traduce LID↔PN al
-      // cifrar. Probar ambos deja la ruta funcionando en las dos versiones.
-      lid: result?.lid ?? (await lookupLid(sock, jid)),
-    });
+    res.json(await checkNumber(req.params.name, req.body?.number));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendServiceError(res, err);
   }
 });
-
-/**
- * Consulta el LID de un número en el LIDMappingStore (Baileys 7.x).
- * Devuelve null en 6.7.x, donde el store no existe, y ante cualquier fallo:
- * es un dato de diagnóstico, no vale hacer caer la petición por él.
- */
-async function lookupLid(sock, jid) {
-  try {
-    return (await sock.signalRepository?.lidMapping?.getLIDForPN?.(jid)) ?? null;
-  } catch {
-    return null;
-  }
-}
 
 // ── Test webhook: dispara payload de prueba y reporta resultado ─
 router.post('/:name/webhooks/test', requireApiKey, validateInstanceName, requireOwnership, async (req, res) => {
