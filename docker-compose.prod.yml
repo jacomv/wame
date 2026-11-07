@@ -13,6 +13,9 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-https://wame.soberanagracia.com}
       # Cerrado también para la primera cuenta: créala con la API_KEY de admin.
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      # Servidor MCP (docs/MCP.md). Apagado salvo que el stack defina MCP_ENABLED=true.
+      MCP_ENABLED: ${MCP_ENABLED:-false}
+      PUBLIC_URL: ${PUBLIC_URL:-https://wame.soberanagracia.com}
     networks:
       - proxy
     labels:
