@@ -1,5 +1,5 @@
 // ── State ───────────────────────────────────────────────────────
-let _apiKey       = null;
+let _apiKey       = null; // Legacy API-key panel login, pending migration
 let pollTimer     = null;
 let qrStore       = {};
 let webhookStore  = {};
@@ -12,12 +12,13 @@ async function api(method, path, body) {
   const res = await fetch(path, {
     method,
     headers: {
-      'x-api-key': _apiKey,
+      ...(_apiKey ? { 'x-api-key': _apiKey } : {}),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
+    credentials: 'same-origin',
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) { doLogout(); throw new Error(t('toast.session.expired')); }
+  if (res.status === 401) { await doLogout(false); throw new Error(t('toast.session.expired')); }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `HTTP ${res.status}`);
@@ -43,7 +44,7 @@ function switchTab(tab) {
   }
 }
 
-async function enterApp(apiKey) {
+async function enterApp(apiKey = null) {
   _apiKey = apiKey;
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
@@ -123,7 +124,7 @@ async function doLogin() {
       if (!res.ok) { err.textContent = data.error; btn.disabled = false; return; }
       document.getElementById('login-email').value = '';
       document.getElementById('login-password').value = '';
-      await enterApp(data.apiKey);
+      await enterApp();
 
     } else if (_activeTab === 'register') {
       const email = document.getElementById('reg-email').value.trim();
@@ -140,7 +141,7 @@ async function doLogin() {
       if (!res.ok) { err.textContent = data.error; btn.disabled = false; return; }
       document.getElementById('reg-email').value = '';
       document.getElementById('reg-password').value = '';
-      await enterApp(data.apiKey);
+      await enterApp();
     }
   } catch (e) {
     err.textContent = t('login.error.connect') + e.message;
@@ -148,7 +149,10 @@ async function doLogin() {
   btn.disabled = false;
 }
 
-function doLogout() {
+async function doLogout(revoke = true) {
+  if (revoke) {
+    try { await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
+  }
   _apiKey = null;
   stopPolling();
   instancesData = []; qrStore = {}; webhookStore = {};
@@ -563,6 +567,12 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('tab-register')?.remove();
     }
   }).catch(() => {});
+
+  // Restore a valid HttpOnly session after page refresh.
+  fetch('/auth/session', { credentials: 'same-origin' })
+    .then(r => { if (!r.ok) throw new Error('No active session'); return r.json(); })
+    .then(() => enterApp())
+    .catch(() => {});
 
   // Login tabs
   document.querySelectorAll('.login-tab').forEach(tab => {
