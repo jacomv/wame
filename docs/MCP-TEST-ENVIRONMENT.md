@@ -71,6 +71,8 @@ También puedes usar MCP Inspector en modo gráfico (`npx @modelcontextprotocol/
 - [ ] `send_media` con `http://169.254.169.254/...` se rechaza.
 - [ ] Otra cuenta no ve ni puede revocar la aplicación.
 - [ ] En **Aplicaciones conectadas** aparecen los permisos, las instancias, el último uso y la última acción. *Revocar* deja el token en 401 al instante.
+- [ ] Al apagar "Permitir aplicaciones de IA" el token da 401 al instante y no se puede autorizar nada nuevo. Al encenderlo, el mismo token vuelve a funcionar.
+- [ ] *Revocar todas* pide confirmación, vacía la lista y deja todos los tokens de la cuenta en 401.
 - [ ] `x-api-key` sigue funcionando en la API REST y no sirve en `/mcp`.
 
 ## 6. Limpiar

@@ -611,3 +611,101 @@ describe('compatibilidad y separación de credenciales', () => {
     expect((await status.json()).qr).toBe('QR-SECRETO'); // el panel REST sí necesita el QR
   });
 });
+
+describe('interruptor por cuenta y revocar todas', () => {
+  const carol = registerAccount('carol@example.test', 'ClaveDeCarol12345');
+  assignInstance('carol-inst', carol.id);
+  const carolCookie = cookieOf(carol);
+  const setEnabled = (enabled, headers = { Cookie: carolCookie, Origin: base }) =>
+    fetch(`${base}/auth/connected-apps/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ enabled }) });
+  const mcpStatus = token => postJson('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+    { Authorization: `Bearer ${token}`, Accept: 'application/json, text/event-stream' });
+
+  it('exige sesión, mismo origen y un booleano', async () => {
+    expect((await setEnabled(false, { Origin: base })).status).toBe(401);
+    expect((await setEnabled(false, { Cookie: carolCookie })).status).toBe(403);
+    const bad = await fetch(`${base}/auth/connected-apps/settings`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: carolCookie, Origin: base }, body: JSON.stringify({ enabled: 'no' }),
+    });
+    expect(bad.status).toBe(400);
+    const list = await (await fetch(`${base}/auth/connected-apps`, { headers: { Cookie: carolCookie } })).json();
+    expect(list.enabled).toBe(true);
+  });
+
+  it('apagado bloquea al instante tokens, refresh, códigos y consentimiento; encendido los restaura', async () => {
+    const { client, tokens } = await authorize({ cookie: carolCookie, instances: ['carol-inst'] });
+    const { tokens: aliceTokens } = await authorize();
+    expect((await mcpStatus(tokens.access_token)).status).toBe(200);
+
+    // Código emitido antes de apagar: no se podrá canjear con la cuenta apagada.
+    const pkcePending = pkce();
+    const id = requestIdFrom(await startAuthorization(client.client_id, { scope: 'instances:read', challenge: pkcePending.challenge }));
+    const pendingCode = new URL((await (await approve(id, { cookie: carolCookie, scopes: ['instances:read'], instances: ['carol-inst'] })).json()).redirect).searchParams.get('code');
+
+    expect((await setEnabled(false)).status).toBe(200);
+
+    const blocked = await mcpStatus(tokens.access_token);
+    expect(blocked.status).toBe(401);
+    expect(blocked.headers.get('www-authenticate')).toContain('desactivadas');
+    // Otras cuentas siguen igual.
+    expect((await mcpStatus(aliceTokens.access_token)).status).toBe(200);
+
+    const refresh = await postForm('/token', { grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: client.client_id });
+    expect((await refresh.json()).error).toBe('invalid_grant');
+    const rt = db.prepare('SELECT rotated_at FROM oauth_refresh_tokens WHERE token_hash = ?').get(createHash('sha256').update(tokens.refresh_token).digest('hex'));
+    expect(rt.rotated_at).toBeNull(); // no se gastó
+
+    const exchange = await postForm('/token', { grant_type: 'authorization_code', code: pendingCode, code_verifier: pkcePending.verifier, client_id: client.client_id, redirect_uri: REDIRECT });
+    expect((await exchange.json()).error).toBe('invalid_grant');
+
+    const id2 = requestIdFrom(await startAuthorization(client.client_id, { scope: 'instances:read', challenge: pkce().challenge }));
+    const info = await (await fetch(`${base}/oauth/consent/api/${id2}`, { headers: { Cookie: carolCookie } })).json();
+    expect(info.mcpEnabled).toBe(false);
+    expect((await approve(id2, { cookie: carolCookie, scopes: ['instances:read'], instances: ['carol-inst'] })).status).toBe(403);
+
+    // La autorización sigue en la lista mientras está apagado.
+    const list = await (await fetch(`${base}/auth/connected-apps`, { headers: { Cookie: carolCookie } })).json();
+    expect(list.enabled).toBe(false);
+    expect(list.apps.length).toBeGreaterThan(0);
+
+    expect((await setEnabled(true)).status).toBe(200);
+    expect((await mcpStatus(tokens.access_token)).status).toBe(200);
+    const again = await postForm('/token', { grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: client.client_id });
+    expect(again.status).toBe(200);
+
+    const events = db.prepare("SELECT event FROM mcp_audit_log WHERE account_id = ? AND event LIKE 'account_mcp_%'").all(carol.id).map(r => r.event);
+    expect(events).toEqual(['account_mcp_disabled', 'account_mcp_enabled']);
+  });
+
+  it('el handler de la herramienta también respeta el interruptor', async () => {
+    const { tokens } = await authorize({ cookie: carolCookie, instances: ['carol-inst'] });
+    const grantId = grantIdOf(tokens.access_token);
+    const { authorizeCall } = await import('../src/mcp/tools.js');
+    expect(() => authorizeCall({ extra: { grantId } }, 'instances:read', 'carol-inst')).not.toThrow();
+    db.prepare('UPDATE mcp_account_settings SET enabled = 0 WHERE account_id = ?').run(carol.id);
+    expect(() => authorizeCall({ extra: { grantId } }, 'instances:read', 'carol-inst')).toThrow(/desactivadas/);
+    db.prepare('UPDATE mcp_account_settings SET enabled = 1 WHERE account_id = ?').run(carol.id);
+  });
+
+  it('revocar todas corta todas las autorizaciones de la cuenta y solo de ella', async () => {
+    const a = await authorize({ cookie: carolCookie, instances: ['carol-inst'] });
+    const b = await authorize({ cookie: carolCookie, instances: ['carol-inst'] });
+    const { tokens: aliceTokens } = await authorize();
+
+    expect((await fetch(`${base}/auth/connected-apps/revoke-all`, { method: 'POST', headers: { Cookie: carolCookie } })).status).toBe(403);
+    const res = await fetch(`${base}/auth/connected-apps/revoke-all`, { method: 'POST', headers: { Cookie: carolCookie, Origin: base } });
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.revoked).toBeGreaterThanOrEqual(2);
+
+    for (const { tokens: t, client: c } of [a, b]) {
+      expect((await mcpStatus(t.access_token)).status).toBe(401);
+      const r = await postForm('/token', { grant_type: 'refresh_token', refresh_token: t.refresh_token, client_id: c.client_id });
+      expect((await r.json()).error).toBe('invalid_grant');
+    }
+    expect((await mcpStatus(aliceTokens.access_token)).status).toBe(200);
+    const list = await (await fetch(`${base}/auth/connected-apps`, { headers: { Cookie: carolCookie } })).json();
+    expect(list.apps).toEqual([]);
+    expect(db.prepare("SELECT count(*) n FROM mcp_audit_log WHERE event = 'grants_revoked_all' AND account_id = ?").get(carol.id).n).toBe(1);
+  });
+});
