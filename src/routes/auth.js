@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { registerAccount, loginAccount } from '../accounts.js';
 import { isAdminKey } from '../auth.js';
+import { createSession, findSession, revokeSession, sessionCookie, clearSessionCookie, readSessionCookie } from '../panel-sessions.js';
 
 const router = Router();
 
@@ -76,11 +77,21 @@ router.post('/login', authLimiter, (req, res) => {
     return res.status(401).json({ error: 'Credenciales incorrectas' });
   }
 
-  res.json({
-    ok: true,
-    email: account.email,
-    apiKey: account.apiKey,
-  });
+  const { token } = createSession(account.id);
+  res.setHeader('Set-Cookie', sessionCookie(token, req.secure));
+  res.json({ ok: true, email: account.email });
+});
+
+router.get('/session', (req, res) => {
+  const account = findSession(readSessionCookie(req));
+  if (!account) return res.status(401).json({ error: 'Sesión expirada' });
+  res.json({ ok: true, email: account.email });
+});
+
+router.post('/logout', (req, res) => {
+  revokeSession(readSessionCookie(req));
+  res.setHeader('Set-Cookie', clearSessionCookie(req.secure));
+  res.json({ ok: true });
 });
 
 export default router;
