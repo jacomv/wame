@@ -452,6 +452,62 @@ async function disconnectInstance(name) {
   } catch (e) { toast('err', e.message); }
 }
 
+// ── Rotate API key modal ────────────────────────────────────────
+function openRotateModal() {
+  document.getElementById('rotate-password').value = '';
+  document.getElementById('rotate-error').textContent = '';
+  document.getElementById('rotate-new-key').value = '';
+  document.getElementById('rotate-step-password').classList.remove('hidden');
+  document.getElementById('rotate-step-key').classList.add('hidden');
+  document.getElementById('modal-rotate').classList.remove('hidden');
+  document.getElementById('rotate-password').focus();
+}
+
+// Clears the secret from the DOM when the modal closes.
+function closeRotateModal() {
+  document.getElementById('rotate-password').value = '';
+  document.getElementById('rotate-new-key').value = '';
+  document.getElementById('modal-rotate').classList.add('hidden');
+}
+
+async function rotateApiKey() {
+  const input = document.getElementById('rotate-password');
+  const errorEl = document.getElementById('rotate-error');
+  const btn = document.getElementById('btn-rotate-confirm');
+  if (!input.value) { errorEl.textContent = t('rotate.error.password'); return; }
+  errorEl.textContent = '';
+  btn.disabled = true;
+  try {
+    const response = await fetch('/auth/api-key/rotate', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: input.value }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || t('login.error.server'));
+    input.value = '';
+    document.getElementById('rotate-new-key').value = data.apiKey;
+    document.getElementById('rotate-step-password').classList.add('hidden');
+    document.getElementById('rotate-step-key').classList.remove('hidden');
+    document.getElementById('rotate-new-key').select();
+  } catch (error) {
+    errorEl.textContent = error.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function copyRotatedKey() {
+  const field = document.getElementById('rotate-new-key');
+  try {
+    await navigator.clipboard.writeText(field.value);
+  } catch (_) {
+    field.select();
+    document.execCommand('copy');
+  }
+  toast('ok', t('rotate.copied'));
+}
+
 // ── New instance modal ──────────────────────────────────────────
 function openNewModal() {
   document.getElementById('modal-new').classList.remove('hidden');
@@ -569,22 +625,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('reg-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
   // Key rotation requires password re-authentication and reveals the key once.
-  document.getElementById('btn-rotate-key').addEventListener('click', async () => {
-    const password = prompt('Confirm your password to rotate the integration API key. The previous key will stop working immediately.');
-    if (!password) return;
-    if (!confirm('Rotate the API key now? Existing integrations using the old key will stop working.')) return;
-    try {
-      const response = await fetch('/auth/api-key/rotate', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Rotation failed');
-      // A blocking prompt lets the user copy the new secret before closing it.
-      prompt('New API key (copy it now; it will not be shown again):', data.apiKey);
-    } catch (error) { alert(error.message); }
-  });
+  document.getElementById('btn-rotate-key').addEventListener('click', openRotateModal);
+  document.getElementById('btn-rotate-cancel').addEventListener('click', closeRotateModal);
+  document.getElementById('btn-rotate-done').addEventListener('click', closeRotateModal);
+  document.getElementById('btn-rotate-confirm').addEventListener('click', rotateApiKey);
+  document.getElementById('btn-rotate-copy').addEventListener('click', copyRotatedKey);
+  document.getElementById('rotate-password').addEventListener('keydown', e => { if (e.key === 'Enter') rotateApiKey(); });
 
   // Logout
   document.getElementById('btn-logout').addEventListener('click', () => doLogout());

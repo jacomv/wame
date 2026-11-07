@@ -22,6 +22,19 @@ const TRANSLATIONS = {
     'nav.logs':                'Logs',
     'sidebar.authenticated':   'Authenticated',
 
+    // API key rotation
+    'rotate.btn':              'Rotate API key',
+    'rotate.title':            'Rotate API key',
+    'rotate.warning':          'The current key will stop working immediately. Update your integrations with the new one.',
+    'rotate.password':         'Confirm your password',
+    'rotate.confirm':          'Rotate key',
+    'rotate.new_key':          'New API key',
+    'rotate.copy_now':         'Copy it now: it will not be shown again.',
+    'rotate.copy':             'Copy',
+    'rotate.copied':           'API key copied',
+    'rotate.done':             'Done',
+    'rotate.error.password':   'Enter your password',
+
     // Version / updates
     'version.label':           'Version',
     'version.unknown':         'Version unknown',
@@ -131,6 +144,18 @@ const TRANSLATIONS = {
     'nav.instances':           'Instancias',
     'nav.logs':                'Logs',
     'sidebar.authenticated':   'Autenticado',
+
+    'rotate.btn':              'Rotar API key',
+    'rotate.title':            'Rotar API key',
+    'rotate.warning':          'La clave actual dejará de funcionar de inmediato. Actualiza tus integraciones con la nueva.',
+    'rotate.password':         'Confirma tu contraseña',
+    'rotate.confirm':          'Rotar clave',
+    'rotate.new_key':          'Nueva API key',
+    'rotate.copy_now':         'Cópiala ahora: no se volverá a mostrar.',
+    'rotate.copy':             'Copiar',
+    'rotate.copied':           'API key copiada',
+    'rotate.done':             'Listo',
+    'rotate.error.password':   'Escribe tu contraseña',
 
     // Versión / actualizaciones
     'version.label':           'Versión',
