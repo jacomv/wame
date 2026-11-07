@@ -13,6 +13,7 @@ const router = Router();
  * cerrado por seguridad. Habilitarlo explícitamente solo si se requiere.
  */
 export function registrationOpen() {
+  if (process.env.ALLOW_REGISTRATION === 'false') return false;
   return process.env.ALLOW_REGISTRATION === 'true' || !db.prepare('SELECT 1 FROM accounts LIMIT 1').get();
 }
 
