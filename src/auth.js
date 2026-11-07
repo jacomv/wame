@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'crypto';
 import { findByApiKey } from './accounts.js';
+import { findSession, readSessionCookie } from './panel-sessions.js';
 
 /** Comparación en tiempo constante para evitar timing attacks */
 function safeCompare(a, b) {
@@ -23,6 +24,20 @@ export function isAdminKey(key) {
  * 2. API key de cuenta registrada (DB)     → req.account = { id, email, ... }, req.isAdmin = false
  */
 export function requireApiKey(req, res, next) {
+  const sessionToken = readSessionCookie(req);
+  if (sessionToken) {
+    const session = findSession(sessionToken);
+    if (session && ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      req.account = session;
+      req.isAdmin = false;
+      return next();
+    }
+    if (session && req.headers.origin && new URL(req.headers.origin).host === req.get('host')) {
+      req.account = session;
+      req.isAdmin = false;
+      return next();
+    }
+  }
   const key = req.headers['x-api-key'];
   if (!key) {
     return res.status(401).json({ error: 'API key requerida' });
