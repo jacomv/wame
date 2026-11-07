@@ -39,8 +39,8 @@ router.post('/register', authLimiter, (req, res) => {
   if (!email || typeof email !== 'string') {
     return res.status(400).json({ error: 'Campo "email" requerido' });
   }
-  if (!password || typeof password !== 'string' || password.length < 6) {
-    return res.status(400).json({ error: 'Campo "password" requerido (mínimo 6 caracteres)' });
+  if (!password || typeof password !== 'string' || password.length < 12) {
+    return res.status(400).json({ error: 'Campo "password" requerido (mínimo 12 caracteres)' });
   }
 
   // Validación básica de email
@@ -67,7 +67,7 @@ router.post('/register', authLimiter, (req, res) => {
 router.post('/login', authLimiter, (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
     return res.status(400).json({ error: 'Campos "email" y "password" requeridos' });
   }
 
