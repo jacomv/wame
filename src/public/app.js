@@ -1,5 +1,4 @@
 // ── State ───────────────────────────────────────────────────────
-let _apiKey       = null; // Legacy API-key panel login, pending migration
 let pollTimer     = null;
 let qrStore       = {};
 let webhookStore  = {};
@@ -12,7 +11,6 @@ async function api(method, path, body) {
   const res = await fetch(path, {
     method,
     headers: {
-      ...(_apiKey ? { 'x-api-key': _apiKey } : {}),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     credentials: 'same-origin',
@@ -27,7 +25,7 @@ async function api(method, path, body) {
 }
 
 // ── Auth ────────────────────────────────────────────────────────
-let _activeTab = 'apikey';
+let _activeTab = 'email';
 
 function switchTab(tab) {
   _activeTab = tab;
@@ -44,8 +42,7 @@ function switchTab(tab) {
   }
 }
 
-async function enterApp(apiKey = null) {
-  _apiKey = apiKey;
+async function enterApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   applyTranslations();
@@ -99,18 +96,7 @@ async function doLogin() {
   err.textContent = '';
 
   try {
-    if (_activeTab === 'apikey') {
-      const key = document.getElementById('login-input').value.trim();
-      if (!key) { err.textContent = t('login.error.invalid'); btn.disabled = false; return; }
-
-      const res = await fetch('/status', { headers: { 'x-api-key': key } });
-      if (res.status === 401) { err.textContent = t('login.error.invalid'); btn.disabled = false; return; }
-      if (res.status === 429) { err.textContent = t('login.error.rate_limit'); btn.disabled = false; return; }
-      if (!res.ok) { err.textContent = t('login.error.server'); btn.disabled = false; return; }
-      document.getElementById('login-input').value = '';
-      await enterApp(key);
-
-    } else if (_activeTab === 'email') {
+    if (_activeTab === 'email') {
       const email = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
       if (!email || !password) { err.textContent = t('login.error.fields'); btn.disabled = false; return; }
@@ -153,13 +139,11 @@ async function doLogout(revoke = true) {
   if (revoke) {
     try { await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
   }
-  _apiKey = null;
   stopPolling();
   instancesData = []; qrStore = {}; webhookStore = {};
   detailName = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('login-input').value = '';
   document.getElementById('login-error').textContent = '';
   showView('instances');
 }
@@ -581,12 +565,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Login
   document.getElementById('login-btn').addEventListener('click', doLogin);
-  document.getElementById('login-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('login-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('reg-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
   // Logout
-  document.getElementById('btn-logout').addEventListener('click', doLogout);
+  document.getElementById('btn-logout').addEventListener('click', () => doLogout());
 
   // Sidebar nav
   document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
