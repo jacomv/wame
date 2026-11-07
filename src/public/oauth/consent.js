@@ -24,6 +24,7 @@
     'badge.sensitive': 'sensitive',
     'status.connected': 'connected',
     'status.other': 'not connected',
+    'err.disabled': 'AI apps are turned off on your account. Turn them on in Wame → Connected apps, then connect again from the application.',
   };
   const ES = {
     'err.pick_instance': 'Elige al menos una instancia',
@@ -32,6 +33,7 @@
     'badge.sensitive': 'sensible',
     'status.connected': 'conectada',
     'status.other': 'sin conexión',
+    'err.disabled': 'Las aplicaciones de IA están desactivadas en tu cuenta. Actívalas en Wame → Aplicaciones conectadas y vuelve a conectar desde la aplicación.',
   };
   const t = key => (lang === 'en' ? EN[key] : ES[key]) ?? key;
 
@@ -73,6 +75,7 @@
   }
 
   function render(data) {
+    if (data.mcpEnabled === false) return showError(t('err.disabled'));
     $('client-name').textContent = data.client.name;
     $('account-email').textContent = data.account;
     $('redirect-host').textContent = (() => { try { return new URL(data.redirectUri).host || data.redirectUri; } catch { return data.redirectUri; } })();
