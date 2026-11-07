@@ -39,6 +39,7 @@ export function authorizeCall(authInfo, scope, instance) {
   const grantId = authInfo?.extra?.grantId;
   const grant = grantId ? store.getGrant(grantId) : null;
   if (!grant || grant.revokedAt) throw new AccessError('La autorización fue revocada');
+  if (!store.isAccountMcpEnabled(grant.accountId)) throw new AccessError('Las aplicaciones de IA están desactivadas en esta cuenta');
   if (!grant.scopes.includes(scope)) throw new AccessError(`Esta autorización no tiene el permiso ${scope}`);
   if (instance !== undefined) {
     if (!grant.instances.includes(instance)) {

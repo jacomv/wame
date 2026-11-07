@@ -139,6 +139,13 @@ db.exec(`
     detail TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_mcp_audit_grant ON mcp_audit_log(grant_id, created_at);
+
+  -- Interruptor por cuenta. Sin fila = activado (comportamiento anterior).
+  CREATE TABLE IF NOT EXISTS mcp_account_settings (
+    account_id INTEGER PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
 `);
 
 export default db;
