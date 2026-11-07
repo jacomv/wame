@@ -6,7 +6,7 @@ import express from 'express';
 
 const dir = mkdtempSync(join(tmpdir(), 'wame-http-auth-'));
 process.env.DATA_DIR = dir;
-process.env.ALLOW_REGISTRATION = 'false';
+delete process.env.ALLOW_REGISTRATION;
 const { default: db } = await import('../src/db.js');
 const { default: authRoutes } = await import('../src/routes/auth.js');
 const { requireApiKey } = await import('../src/auth.js');
