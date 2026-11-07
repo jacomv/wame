@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-account AI apps switch** in Connected apps. Turning it off blocks every
+  MCP token, code exchange, refresh and new consent for that account at once,
+  without deleting authorizations; turning it back on restores them (refresh
+  tokens are not consumed while off). Other accounts are unaffected.
+- **Revoke all** in Connected apps, behind a confirmation modal.
+
 - **MCP server for AI assistants** (`MCP_ENABLED=true`, `PUBLIC_URL`). A remote
   MCP server over Streamable HTTP at `/mcp`, so Claude, ChatGPT and other
   agents can use WhatsApp without receiving a permanent API key.

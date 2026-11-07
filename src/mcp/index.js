@@ -94,6 +94,8 @@ function consentRouter(config) {
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       account: req.account.email,
+      // Con la cuenta apagada la pantalla avisa y no deja autorizar.
+      mcpEnabled: store.isAccountMcpEnabled(req.account.id),
       client: store.describeClient(client),
       redirectUri: pending.redirect_uri,
       // Sin scopes pedidos se ofrecen todos y el usuario elige; si el cliente
@@ -112,6 +114,9 @@ function consentRouter(config) {
     if (!ctx) return;
     const { pending, client } = ctx;
     const { scopes, instances } = req.body || {};
+    if (!store.isAccountMcpEnabled(req.account.id)) {
+      return res.status(403).json({ error: 'Las aplicaciones de IA están desactivadas en tu cuenta. Actívalas en Wame → Aplicaciones conectadas.' });
+    }
 
     if (!Array.isArray(scopes) || !scopes.length || scopes.some(s => typeof s !== 'string')) {
       return res.status(400).json({ error: 'Elige al menos un permiso' });
@@ -174,7 +179,24 @@ function connectedAppsRouter() {
         lastActivity: last && { at: last.created_at, tool: last.tool, instance: last.instance, outcome: last.outcome },
       };
     });
-    res.json({ apps });
+    res.json({ enabled: store.isAccountMcpEnabled(req.account.id), apps });
+  });
+
+  // Interruptor por cuenta: apagado, el servidor rechaza al instante todo token
+  // de la cuenta y no deja autorizar clientes nuevos. Las autorizaciones se
+  // conservan y vuelven a funcionar al encenderlo.
+  router.put('/settings', requirePanelSession, express.json({ limit: '1kb' }), (req, res) => {
+    const enabled = req.body?.enabled;
+    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'Campo "enabled" (booleano) requerido' });
+    store.setAccountMcpEnabled(req.account.id, enabled);
+    store.audit(enabled ? 'account_mcp_enabled' : 'account_mcp_disabled', { accountId: req.account.id });
+    res.json({ enabled });
+  });
+
+  router.post('/revoke-all', requirePanelSession, (req, res) => {
+    const ids = store.revokeAllGrants(req.account.id);
+    store.audit('grants_revoked_all', { accountId: req.account.id, detail: `${ids.length} autorizaciones` });
+    res.json({ ok: true, revoked: ids.length });
   });
 
   router.delete('/:id', requirePanelSession, (req, res) => {

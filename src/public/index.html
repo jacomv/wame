@@ -229,6 +229,20 @@ body {
 
 /* ── Connected apps ── */
 .apps-intro { color: var(--text-2); font-size: 0.875rem; margin-bottom: 1rem; }
+.apps-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.switch-row { display: flex; align-items: center; gap: 0.85rem; cursor: pointer; }
+.switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch-slider { position: absolute; inset: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 99px; transition: background 0.15s, border-color 0.15s; }
+.switch-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: var(--text-2); border-radius: 50%; transition: transform 0.15s, background 0.15s; }
+.switch input:checked + .switch-slider { background: var(--accent-dim); border-color: var(--accent); }
+.switch input:checked + .switch-slider::before { transform: translateX(18px); background: var(--accent); }
+.switch input:focus-visible + .switch-slider { box-shadow: 0 0 0 3px var(--accent-dim); }
+.switch-title { display: block; font-weight: 500; }
+.switch-desc { display: block; font-size: 0.8125rem; color: var(--text-2); }
+.switch-desc.off { color: var(--yellow); }
+.apps-banner { padding: 0.75rem 1rem; border-radius: var(--radius); background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(245,158,11,0.25); font-size: 0.875rem; margin-bottom: 1rem; }
+#apps-list.disabled .app-card { opacity: 0.55; }
 #apps-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
 .app-card { background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius); padding: 1.25rem; }
 .app-name { font-size: 1rem; font-weight: 600; }
@@ -520,6 +534,17 @@ tr:hover td { background: var(--surface-2); }
         </button>
       </div>
       <div class="page-content">
+        <div class="apps-toolbar">
+          <label class="switch-row" for="apps-enabled">
+            <span class="switch"><input type="checkbox" id="apps-enabled"><span class="switch-slider"></span></span>
+            <span>
+              <span class="switch-title" data-i18n="apps.switch">Allow AI apps on my account</span>
+              <span class="switch-desc" id="apps-switch-desc"></span>
+            </span>
+          </label>
+          <button class="btn btn-danger" id="btn-revoke-all" type="button" data-i18n="apps.revoke_all">Revoke all</button>
+        </div>
+        <div class="apps-banner hidden" id="apps-disabled-banner" data-i18n="apps.disabled_banner">AI apps are turned off. Every connected app is blocked right now; turn the switch back on to restore them.</div>
         <p class="apps-intro" data-i18n="apps.intro">AI assistants (MCP clients) you authorized to use your instances. Revoking takes effect immediately.</p>
         <div id="apps-list"></div>
       </div>
@@ -536,6 +561,18 @@ tr:hover td { background: var(--surface-2); }
     <div class="modal-actions">
       <button class="btn btn-secondary" id="btn-revoke-cancel" type="button" data-i18n="btn.cancel">Cancel</button>
       <button class="btn btn-danger" id="btn-revoke-confirm" type="button" data-i18n="apps.revoke.confirm">Revoke</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: revoke all connected apps -->
+<div class="modal-overlay hidden" id="modal-revoke-all">
+  <div class="modal">
+    <div class="modal-title" data-i18n="apps.revoke_all.title">Revoke all apps</div>
+    <p class="modal-text" data-i18n="apps.revoke_all.text">Every connected app will lose access at once. To use them again you will have to authorize each one from the beginning.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btn-revoke-all-cancel" type="button" data-i18n="btn.cancel">Cancel</button>
+      <button class="btn btn-danger" id="btn-revoke-all-confirm" type="button" data-i18n="apps.revoke_all">Revoke all</button>
     </div>
   </div>
 </div>

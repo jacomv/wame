@@ -157,6 +157,28 @@ export const revokeGrant = db.transaction(id => {
   return changed;
 });
 
+/** Revoca todas las autorizaciones activas de una cuenta. Devuelve los ids revocados. */
+export const revokeAllGrants = db.transaction(accountId => {
+  const ids = stmtGrantsByAccount.all(accountId).map(r => r.id);
+  for (const id of ids) revokeGrant(id);
+  return ids;
+});
+
+// ── Interruptor por cuenta ──────────────────────────────────────
+const stmtSettingGet = db.prepare('SELECT enabled FROM mcp_account_settings WHERE account_id = ?');
+const stmtSettingSet = db.prepare(`INSERT INTO mcp_account_settings (account_id, enabled, updated_at) VALUES (?, ?, ?)
+  ON CONFLICT(account_id) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at`);
+
+/** ¿La cuenta permite aplicaciones MCP? Sin preferencia guardada, sí. */
+export function isAccountMcpEnabled(accountId) {
+  const row = stmtSettingGet.get(accountId);
+  return row ? row.enabled === 1 : true;
+}
+
+export function setAccountMcpEnabled(accountId, enabled) {
+  stmtSettingSet.run(accountId, enabled ? 1 : 0, isoNow());
+}
+
 /** Quita una instancia de todos los grants (por ejemplo, al borrarla). */
 export function removeInstanceFromGrants(instanceName) {
   db.prepare('DELETE FROM mcp_grant_instances WHERE instance_name = ?').run(instanceName);

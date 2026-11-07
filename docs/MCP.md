@@ -122,6 +122,21 @@ En todos los casos la URL es `<PUBLIC_URL>/mcp`. El cliente descubre el resto so
 
 Para revocar el acceso: panel de WAME → **Aplicaciones conectadas** → *Revocar*. El efecto es inmediato en el servidor.
 
+## Apagar las aplicaciones de IA de una cuenta
+
+En **Aplicaciones conectadas**, cada cuenta tiene el interruptor **"Permitir aplicaciones de IA en mi cuenta"** (activado por omisión). Al apagarlo:
+
+- el servidor rechaza al instante todos los tokens de esa cuenta (`401` con `invalid_token`), y también el canje de códigos y los refresh;
+- la pantalla de consentimiento avisa y no deja autorizar clientes nuevos;
+- las autorizaciones **se conservan**. Los refresh tokens no se gastan mientras está apagado, así que al volver a encenderlo cada aplicación sigue funcionando sin tener que reconectarla;
+- las demás cuentas no se ven afectadas.
+
+**Revocar todas** borra de una vez todas las autorizaciones de la cuenta y sus tokens. Para volver a usar cualquier aplicación hay que autorizarla desde el principio.
+
+Para apagar el MCP de **todo** el servidor, la vía sigue siendo `MCP_ENABLED=false`.
+
+Ambas acciones quedan en la auditoría (`account_mcp_disabled`, `account_mcp_enabled`, `grants_revoked_all`). API del panel: `PUT /auth/connected-apps/settings` con `{"enabled": true|false}` y `POST /auth/connected-apps/revoke-all`. Las dos exigen la sesión del panel y un `Origin` del mismo sitio.
+
 ## Entorno de pruebas aislado
 
 Ver [MCP-TEST-ENVIRONMENT.md](./MCP-TEST-ENVIRONMENT.md).
@@ -130,7 +145,7 @@ Ver [MCP-TEST-ENVIRONMENT.md](./MCP-TEST-ENVIRONMENT.md).
 
 ### Migración de la base
 
-Al arrancar se crean, si no existen, estas tablas: `oauth_clients`, `oauth_pending_authorizations`, `mcp_grants`, `mcp_grant_instances`, `oauth_authorization_codes`, `oauth_access_tokens`, `oauth_refresh_tokens` y `mcp_audit_log`. No se modifica ninguna tabla existente, así que volver a la versión anterior es seguro: las tablas nuevas simplemente se ignoran.
+Al arrancar se crean, si no existen, estas tablas: `oauth_clients`, `oauth_pending_authorizations`, `mcp_grants`, `mcp_grant_instances`, `oauth_authorization_codes`, `oauth_access_tokens`, `oauth_refresh_tokens`, `mcp_audit_log` y `mcp_account_settings` (interruptor por cuenta; sin fila equivale a activado). No se modifica ninguna tabla existente, así que volver a la versión anterior es seguro: las tablas nuevas simplemente se ignoran.
 
 ### Pasos
 

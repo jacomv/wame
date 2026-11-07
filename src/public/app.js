@@ -562,10 +562,53 @@ async function fetchLogs() {
 // ── Connected apps (MCP) ────────────────────────────────────────
 let revokeTarget = null;
 
+function renderAppsSwitch(enabled) {
+  document.getElementById('apps-enabled').checked = enabled;
+  const desc = document.getElementById('apps-switch-desc');
+  desc.textContent = t(enabled ? 'apps.switch.on' : 'apps.switch.off');
+  desc.classList.toggle('off', !enabled);
+  document.getElementById('apps-disabled-banner').classList.toggle('hidden', enabled);
+  document.getElementById('apps-list').classList.toggle('disabled', !enabled);
+}
+
+async function toggleApps(e) {
+  const input = e.target;
+  const enabled = input.checked;
+  input.disabled = true;
+  try {
+    const res = await api('PUT', '/auth/connected-apps/settings', { enabled });
+    renderAppsSwitch(res.enabled);
+    // Verde al activar, naranja al bloquear.
+    toast(res.enabled ? 'ok' : 'info', t(res.enabled ? 'apps.enabled_toast' : 'apps.disabled_toast'));
+  } catch (err) {
+    input.checked = !enabled;
+    toast('err', err.message);
+  } finally {
+    input.disabled = false;
+  }
+}
+
+function openRevokeAllModal() { document.getElementById('modal-revoke-all').classList.remove('hidden'); }
+function closeRevokeAllModal() { document.getElementById('modal-revoke-all').classList.add('hidden'); }
+
+async function confirmRevokeAll() {
+  const btn = document.getElementById('btn-revoke-all-confirm');
+  btn.disabled = true;
+  try {
+    const res = await api('POST', '/auth/connected-apps/revoke-all');
+    toast('ok', `${t('apps.revoked_all')} ${res.revoked}`);
+    closeRevokeAllModal();
+    fetchApps();
+  } catch (e) { toast('err', e.message); }
+  finally { btn.disabled = false; }
+}
+
 async function fetchApps() {
   const list = document.getElementById('apps-list');
   try {
-    const { apps } = await api('GET', '/auth/connected-apps');
+    const { apps, enabled } = await api('GET', '/auth/connected-apps');
+    renderAppsSwitch(enabled);
+    document.getElementById('btn-revoke-all').disabled = !apps.length;
     if (!apps.length) {
       list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔌</div><p>${t('apps.empty')}</p></div>`;
       return;
@@ -737,6 +780,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-refresh-apps').addEventListener('click', fetchApps);
   document.getElementById('btn-revoke-cancel').addEventListener('click', closeRevokeModal);
   document.getElementById('btn-revoke-confirm').addEventListener('click', confirmRevoke);
+  document.getElementById('apps-enabled').addEventListener('change', toggleApps);
+  document.getElementById('btn-revoke-all').addEventListener('click', openRevokeAllModal);
+  document.getElementById('btn-revoke-all-cancel').addEventListener('click', closeRevokeAllModal);
+  document.getElementById('btn-revoke-all-confirm').addEventListener('click', confirmRevokeAll);
 
   // Delegated clicks
   document.getElementById('main').addEventListener('click', e => {

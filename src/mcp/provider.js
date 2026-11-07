@@ -27,6 +27,8 @@ export function isAllowedRedirectUri(value) {
   return /^[a-z][a-z0-9+.-]*:$/.test(url.protocol);
 }
 
+const DISABLED = 'Las aplicaciones de IA están desactivadas en esta cuenta';
+
 export function createProvider(config) {
   const ttl = { accessTtl: config.accessTokenTtl, refreshTtl: config.refreshTokenTtl };
   const resource = config.resourceUrl.href;
@@ -95,6 +97,7 @@ export function createProvider(config) {
       }
       const grant = store.getGrant(row.grant_id);
       if (!grant || grant.revokedAt) throw new InvalidGrantError('La autorización fue revocada');
+      if (!store.isAccountMcpEnabled(grant.accountId)) throw new InvalidGrantError(DISABLED);
 
       const t = store.issueTokens(grant.id, client.client_id, ttl);
       store.audit('token_issued', { accountId: grant.accountId, grantId: grant.id, clientId: client.client_id });
@@ -114,6 +117,9 @@ export function createProvider(config) {
 
       const grant = store.getGrant(row.grant_id);
       if (!grant || grant.revokedAt) throw new InvalidGrantError('La autorización fue revocada');
+      // Se comprueba antes de rotar: con la cuenta apagada el refresh token no se gasta
+      // y vuelve a servir cuando el usuario reactive las aplicaciones.
+      if (!store.isAccountMcpEnabled(grant.accountId)) throw new InvalidGrantError(DISABLED);
 
       // Un refresh token rotado que vuelve a aparecer indica robo: se revoca todo el grant.
       if (row.rotated_at || !store.markRefreshRotated(row.token_hash)) {
@@ -145,6 +151,7 @@ export function createProvider(config) {
       if (row.expires_at <= Math.floor(Date.now() / 1000)) throw new InvalidTokenError('Token vencido');
       const grant = store.getGrant(row.grant_id);
       if (!grant || grant.revokedAt) throw new InvalidTokenError('La autorización fue revocada');
+      if (!store.isAccountMcpEnabled(grant.accountId)) throw new InvalidTokenError(DISABLED);
       return {
         token,
         clientId: row.client_id,
