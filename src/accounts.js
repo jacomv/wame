@@ -1,5 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'crypto';
 import db from './db.js';
+import { removeInstanceFromGrants } from './mcp/store.js';
 
 // Existing plaintext keys are migrated in-place to SHA-256 on startup.
 // Keys are high-entropy random secrets, so a fast keyed lookup hash is appropriate.
@@ -97,4 +98,6 @@ export function getOwnedInstances(accountId) {
 
 export function removeInstanceOwner(instanceName) {
   stmtRemoveOwner.run(instanceName);
+  // Un nombre liberado puede reclamarlo otra cuenta: ningún cliente MCP debe heredarlo.
+  removeInstanceFromGrants(instanceName);
 }

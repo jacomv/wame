@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<title>Autorizar aplicación — Wame</title>
+<style>
+:root {
+  --bg: #09090b; --surface: #18181b; --surface-2: #27272a; --border: #3f3f46;
+  --text: #fafafa; --text-2: #a1a1aa; --text-3: #71717a;
+  --accent: #22c55e; --accent-dim: rgba(34,197,94,0.12);
+  --red: #ef4444; --red-dim: rgba(239,68,68,0.12);
+  --yellow: #f59e0b; --yellow-dim: rgba(245,158,11,0.12);
+  --radius: 8px; --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, 'SF Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 480px; }
+.logo { font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; } .logo span { color: var(--accent); }
+h1 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; }
+.muted { color: var(--text-2); font-size: 0.875rem; }
+.section { margin-top: 1.5rem; }
+.section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin-bottom: 0.6rem; font-weight: 600; }
+.check { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.7rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; cursor: pointer; }
+.check:hover { background: var(--surface-2); }
+.check input { margin-top: 0.25rem; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+.check .name { font-weight: 500; }
+.check .desc { color: var(--text-2); font-size: 0.8125rem; }
+code { font-family: var(--mono); font-size: 0.8125rem; color: var(--text-2); }
+.badge { display: inline-block; font-size: 0.6875rem; font-weight: 600; padding: 0.05rem 0.45rem; border-radius: 999px; margin-left: 0.4rem; vertical-align: middle; }
+.badge.ok { color: var(--accent); background: var(--accent-dim); }
+.badge.warn { color: var(--yellow); background: var(--yellow-dim); }
+.badge.danger { color: var(--red); background: var(--red-dim); }
+.notice { margin-top: 1rem; padding: 0.75rem 0.9rem; border-radius: var(--radius); background: var(--yellow-dim); color: var(--yellow); font-size: 0.8125rem; }
+.error { color: var(--red); font-size: 0.875rem; min-height: 1.25rem; margin-top: 0.75rem; }
+.actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem; }
+.btn { font: inherit; font-weight: 500; border-radius: var(--radius); padding: 0.6rem 1.1rem; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #052e16; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+label.field { display: block; font-size: 0.8125rem; color: var(--text-2); margin: 0.9rem 0 0.35rem; }
+input.field { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font: inherit; padding: 0.6rem 0.8rem; }
+input.field:focus { outline: none; border-color: var(--accent); }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="logo"><span>W</span>ame</div>
+
+  <div id="view-loading" class="muted" data-t="loading">Cargando…</div>
+
+  <div id="view-error" class="hidden">
+    <h1 data-t="error.title">No se puede continuar</h1>
+    <p class="muted" id="error-text"></p>
+  </div>
+
+  <form id="view-login" class="hidden" autocomplete="on">
+    <h1 data-t="login.title">Inicia sesión en Wame</h1>
+    <p class="muted" data-t="login.subtitle">Una aplicación pide acceso a tu cuenta. Entra para revisar la solicitud.</p>
+    <label class="field" for="login-email">Email</label>
+    <input class="field" id="login-email" type="email" autocomplete="email" required>
+    <label class="field" for="login-password" data-t="login.password">Contraseña</label>
+    <input class="field" id="login-password" type="password" autocomplete="current-password" required>
+    <div class="error" id="login-error"></div>
+    <div class="actions"><button class="btn btn-primary" type="submit" data-t="login.btn">Entrar</button></div>
+  </form>
+
+  <div id="view-consent" class="hidden">
+    <h1><span id="client-name"></span> <span data-t="consent.wants">quiere usar tu WhatsApp en Wame</span></h1>
+    <p class="muted"><span data-t="consent.account">Cuenta</span>: <strong id="account-email"></strong></p>
+    <p class="muted"><span data-t="consent.redirect">Después volverás a</span> <code id="redirect-host"></code></p>
+
+    <div class="section">
+      <div class="section-title" data-t="consent.instances">Instancias que podrá usar</div>
+      <div id="instances"></div>
+      <div id="no-instances" class="notice hidden" data-t="consent.no_instances">Tu cuenta no tiene instancias propias. Conecta una desde el panel antes de autorizar una aplicación.</div>
+    </div>
+
+    <div class="section">
+      <div class="section-title" data-t="consent.scopes">Permisos</div>
+      <div id="scopes"></div>
+    </div>
+
+    <div class="notice" data-t="consent.notice">Solo autoriza aplicaciones en las que confíes. Puedes revocar el acceso cuando quieras en Wame → Aplicaciones conectadas.</div>
+    <div class="error" id="consent-error"></div>
+    <div class="actions">
+      <button class="btn" id="btn-deny" type="button" data-t="consent.deny">Rechazar</button>
+      <button class="btn btn-primary" id="btn-approve" type="button" data-t="consent.approve">Autorizar</button>
+    </div>
+  </div>
+</main>
+<script src="/oauth/consent.js"></script>
+</body>
+</html>

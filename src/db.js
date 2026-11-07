@@ -56,4 +56,89 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_message_logs_created_at ON message_logs(created_at);
 `);
 
+// ── OAuth 2.1 para clientes MCP ─────────────────────────────────
+// Secretos, códigos y tokens se guardan solo como SHA-256. Un grant es la
+// autorización de una cuenta a un cliente: sus permisos e instancias se leen en
+// cada petición, así que revocar o reducir un grant tiene efecto inmediato.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id TEXT PRIMARY KEY,
+    client_secret_hash TEXT,
+    client_secret_expires_at INTEGER,
+    metadata TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS oauth_pending_authorizations (
+    id_hash TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    code_challenge TEXT NOT NULL,
+    state TEXT,
+    scopes TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS mcp_grants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    client_id TEXT NOT NULL,
+    scopes TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    last_used_at TEXT,
+    revoked_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_mcp_grants_account ON mcp_grants(account_id);
+
+  CREATE TABLE IF NOT EXISTS mcp_grant_instances (
+    grant_id INTEGER NOT NULL,
+    instance_name TEXT NOT NULL,
+    PRIMARY KEY (grant_id, instance_name)
+  );
+
+  CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+    code_hash TEXT PRIMARY KEY,
+    grant_id INTEGER NOT NULL,
+    client_id TEXT NOT NULL,
+    redirect_uri TEXT NOT NULL,
+    code_challenge TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS oauth_access_tokens (
+    token_hash TEXT PRIMARY KEY,
+    grant_id INTEGER NOT NULL,
+    client_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_oauth_access_tokens_grant ON oauth_access_tokens(grant_id);
+
+  CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+    token_hash TEXT PRIMARY KEY,
+    grant_id INTEGER NOT NULL,
+    client_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    rotated_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_grant ON oauth_refresh_tokens(grant_id);
+
+  CREATE TABLE IF NOT EXISTS mcp_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    event TEXT NOT NULL,
+    account_id INTEGER,
+    grant_id INTEGER,
+    client_id TEXT,
+    instance TEXT,
+    tool TEXT,
+    outcome TEXT,
+    detail TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_mcp_audit_grant ON mcp_audit_log(grant_id, created_at);
+`);
+
 export default db;
