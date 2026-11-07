@@ -32,7 +32,7 @@ export function requireApiKey(req, res, next) {
       req.isAdmin = false;
       return next();
     }
-    if (session && req.headers.origin && new URL(req.headers.origin).host === req.get('host')) {
+    if (session && typeof req.headers.origin === 'string' && req.headers.origin === `${req.protocol}://${req.get('host')}`) {
       req.account = session;
       req.isAdmin = false;
       return next();
