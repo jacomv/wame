@@ -568,6 +568,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('reg-password')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+  // Key rotation requires password re-authentication and reveals the key once.
+  document.getElementById('btn-rotate-key').addEventListener('click', async () => {
+    const password = prompt('Confirm your password to rotate the integration API key. The previous key will stop working immediately.');
+    if (!password) return;
+    if (!confirm('Rotate the API key now? Existing integrations using the old key will stop working.')) return;
+    try {
+      const response = await fetch('/auth/api-key/rotate', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Rotation failed');
+      // A blocking prompt lets the user copy the new secret before closing it.
+      prompt('New API key (copy it now; it will not be shown again):', data.apiKey);
+    } catch (error) { alert(error.message); }
+  });
+
   // Logout
   document.getElementById('btn-logout').addEventListener('click', () => doLogout());
 
