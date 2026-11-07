@@ -11,6 +11,8 @@ services:
       SESSION_DIR: /data/sessions
       WEBHOOKS_DIR: /data/webhooks
       CORS_ORIGIN: ${CORS_ORIGIN:-https://wame.soberanagracia.com}
+      # Cerrado también para la primera cuenta: créala con la API_KEY de admin.
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
     networks:
       - proxy
     labels:
