@@ -5,6 +5,72 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] — 2026-11-07
+
+Hardens authentication: the web panel moves to revocable session cookies, API
+keys are stored hashed and rotated with the password, and sign-up closes after
+the first account.
+
+### Security
+
+- **Panel sessions.** The web panel signs in with email and password and keeps
+  a 12-hour `HttpOnly`, `SameSite=Strict` cookie (`Secure` over HTTPS). Only a
+  SHA-256 digest of the token is stored; logout revokes it on the server and a
+  page reload restores a still-valid session. The API key is no longer kept in
+  the browser.
+- **CSRF protection.** Writes authenticated by the cookie must carry a
+  same-origin `Origin` header; a missing, foreign or opaque origin gets 403.
+  Clients that send `x-api-key` are unaffected, and an explicit `x-api-key`
+  always wins over a cookie.
+- **Hashed API keys.** Account keys are stored as SHA-256 digests. Existing
+  plaintext keys are migrated on first start and keep working.
+- **Key rotation.** `POST /auth/api-key/rotate` (and **Rotate API key** in the
+  panel) issues a new key after confirming the password. The old key stops
+  working immediately; the new one is shown once.
+- **Sign-up closed by default.** With `ALLOW_REGISTRATION` unset, the first
+  account can sign up and sign-up closes as soon as it exists; the admin key can
+  still create accounts. `true` keeps it open, `false` closes it even for the
+  first account.
+- **Stronger passwords.** New passwords need at least 12 characters. Existing
+  passwords keep working.
+- **Brute-force lockout.** Besides 10 auth requests/min per IP, 10 failed
+  logins for one email (or 10 failed rotations for one account) within 15
+  minutes return 429, whatever the client IP or `X-Forwarded-For`.
+- **`TRUST_PROXY`.** Sets how many proxies are trusted for `X-Forwarded-*`.
+  Defaults to `1` (behind Traefik/Nginx, as before); set `false` when the port is
+  exposed directly so clients cannot spoof their IP.
+- **No stack traces.** Malformed JSON answers `400 {"error":"JSON inválido"}`
+  and unexpected errors a generic JSON 500. The Docker image runs with
+  `NODE_ENV=production`.
+
+### Changed
+
+- `POST /auth/register` and `POST /auth/login` no longer return `apiKey`; they
+  set the session cookie instead. New endpoints: `GET /auth/session`,
+  `POST /auth/logout`, `POST /auth/api-key/rotate`.
+- The panel no longer has an "API key" sign-in tab. Key rotation uses a modal
+  with a masked password field and a **Copy** button, translated to English and
+  Spanish.
+- `.env.example` leaves `ALLOW_REGISTRATION` unset and documents `TRUST_PROXY`.
+- New isolated test environment (`docker-compose.test.yml`, port 3100 on
+  localhost) and acceptance guide in `docs/TEST-ENVIRONMENT-PR28.md`.
+
+### Upgrading
+
+- **Back up `wame.db` first.** The key migration is one-way: 1.7.0 cannot read
+  hashed keys. To roll back, restore the backup together with the 1.7.0 image.
+- **The admin key no longer opens the panel.** Sign in with an account. If the
+  install has no account yet, create one right after upgrading (the first
+  sign-up is public), or set `ALLOW_REGISTRATION=false` and create it with the
+  admin key.
+- **Integrations keep working** with their current account keys and the admin
+  key. A key can no longer be read back from the panel: whoever lost theirs
+  must rotate it and update their integrations.
+- **Sign-up closes.** Installs that relied on the old default (open sign-up)
+  must set `ALLOW_REGISTRATION=true` to keep it.
+- Behind a reverse proxy, make sure it forwards `X-Forwarded-Proto` so the
+  cookie gets `Secure` and the `Origin` check sees `https`.
+
 ## [1.7.0] — 2026-11-05
 
 Closes two holes in account isolation.

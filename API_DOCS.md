@@ -18,15 +18,18 @@ x-api-key: your-admin-key
 
 ### 2. User accounts (multi-tenant)
 
-Register an account to get a unique API key. Each account only has access to its own instances.
+Each account has a unique API key and only has access to its own instances.
+Registration and login do not return the key: sign in and rotate it (see
+[Rotate API key](#rotate-api-key)), or use **Rotate API key** in the web panel.
 
 ```bash
-# Register
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "mypassword"}'
+BASE=http://localhost:3000
+curl -c cookie.txt -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "a-long-password-123"}' $BASE/auth/login
+curl -b cookie.txt -H "Origin: $BASE" -H "Content-Type: application/json" \
+  -d '{"password": "a-long-password-123"}' $BASE/auth/api-key/rotate
 
-# Response: { "ok": true, "email": "user@example.com", "apiKey": "wame_a1b2c3..." }
+# Response: { "ok": true, "apiKey": "wame_a1b2c3..." }
 ```
 
 Then use the returned key:
@@ -56,7 +59,7 @@ Invalid or missing key returns:
 ```
 
 1. Deploy WAME.
-2. Register an account (`POST /auth/register`) or use the admin `API_KEY`.
+2. Create an account and rotate its API key (`POST /auth/api-key/rotate`), or use the admin `API_KEY`.
 3. Connect an instance — `POST /instances/:name/connect`.
 4. Scan the returned QR with WhatsApp.
 5. Send messages — `POST /instances/:name/send`.
@@ -80,33 +83,34 @@ See [Channels (newsletters)](#channels-newsletters).
 POST /auth/register
 ```
 
-Creates a new account and returns a unique API key. No authentication required
-while registration is open (the default). With `ALLOW_REGISTRATION=false` the
-request must carry the admin key in `x-api-key`.
+Creates an account and starts a panel session (`Set-Cookie: wame_session`). It
+does not return an API key — rotate one with
+[`POST /auth/api-key/rotate`](#rotate-api-key).
+
+No authentication is needed for the first account. Once an account exists,
+sign-up is closed and the request must carry the admin key in `x-api-key`,
+unless `ALLOW_REGISTRATION=true`. With `ALLOW_REGISTRATION=false` the admin key
+is required even for the first account.
 
 **Body:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | Valid email address |
-| `password` | string | Yes | Minimum 6 characters |
+| `password` | string | Yes | Minimum 12 characters |
 
 **Response `201`:**
 
 ```json
-{
-  "ok": true,
-  "email": "user@example.com",
-  "apiKey": "wame_a1b2c3d4e5f6..."
-}
+{ "ok": true, "email": "user@example.com" }
 ```
 
 **Errors:**
 
 | Status | Cause |
 |--------|-------|
-| 400 | Missing/invalid email or password too short |
-| 403 | Registration closed (`ALLOW_REGISTRATION=false`) and no admin key |
+| 400 | Missing/invalid email, password shorter than 12 characters, or malformed JSON |
+| 403 | Sign-up closed and no admin key |
 | 409 | Email already registered |
 | 429 | Rate limit exceeded |
 
@@ -134,7 +138,9 @@ No authentication required. Tells a client whether public sign-up is open.
 POST /auth/login
 ```
 
-No authentication required. Returns the API key for an existing account.
+No authentication required. Starts a panel session: the response sets an
+HttpOnly, SameSite=Strict `wame_session` cookie valid for 12 hours (`Secure`
+over HTTPS). It does not return the API key.
 
 **Body:**
 
@@ -143,22 +149,70 @@ No authentication required. Returns the API key for an existing account.
 | `email` | string | Yes | Registered email |
 | `password` | string | Yes | Account password |
 
-**Response:**
+**Response `200`:**
 
 ```json
-{
-  "ok": true,
-  "email": "user@example.com",
-  "apiKey": "wame_a1b2c3d4e5f6..."
-}
+{ "ok": true, "email": "user@example.com" }
 ```
 
 **Errors:**
 
 | Status | Cause |
 |--------|-------|
+| 400 | Missing fields or malformed JSON |
 | 401 | Invalid credentials |
-| 429 | Rate limit exceeded |
+| 429 | Rate limit exceeded — 10 auth requests/min per IP, or 10 failed logins in 15 minutes for the same email |
+
+---
+
+### Session and logout
+
+```
+GET  /auth/session
+POST /auth/logout
+```
+
+`GET /auth/session` returns `{ "ok": true, "email": "..." }` while the cookie is
+valid, or `401`. `POST /auth/logout` revokes the session on the server and
+clears the cookie; it requires an `Origin` header matching the server (`403`
+otherwise).
+
+Requests authenticated only by the cookie that change data (`POST`, `PUT`,
+`PATCH`, `DELETE`) must send a same-origin `Origin` header. Requests with
+`x-api-key` are not affected.
+
+---
+
+### Rotate API key
+
+```
+POST /auth/api-key/rotate
+```
+
+Issues a new API key for the signed-in account. Requires the session cookie, a
+same-origin `Origin` header and the account password. The previous key stops
+working immediately. The new key is returned once (`Cache-Control: no-store`)
+and stored only as a hash.
+
+**Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `password` | string | Yes | Account password |
+
+**Response `200`:**
+
+```json
+{ "ok": true, "apiKey": "wame_a1b2c3d4e5f6..." }
+```
+
+**Errors:**
+
+| Status | Cause |
+|--------|-------|
+| 401 | No session, or wrong password |
+| 403 | Missing or foreign `Origin` |
+| 429 | Rate limit exceeded — includes 10 failed rotations in 15 minutes per account |
 
 ---
 
@@ -1168,12 +1222,12 @@ Note there is no `to` field — the destination is the JID in the path.
 | HTTP Status | Meaning | Action |
 |-------------|---------|--------|
 | `400` | Bad request — missing fields, invalid phone, unsupported type, malformed channel JID or invite code | Check `to`, `type`, and phone/JID format |
-| `401` | Unauthorized | Check the `x-api-key` header or credentials |
+| `401` | Unauthorized | Check the `x-api-key` header, the session cookie or credentials |
 | `403` | Forbidden — instance belongs to another account, or the account is not `ADMIN`/`OWNER` of the channel | Use your own instances; check `canPublish` before publishing |
 | `404` | Instance, webhook, or channel not found | Verify the name/ID; a channel must exist and be visible to this account |
 | `409` | Conflict — email already registered | Use `/auth/login` instead |
 | `429` | Rate limit exceeded | Back off and retry |
-| `500` | Internal server error | Check server logs |
+| `500` | Internal server error — the body is a generic `{"error":"Error interno"}` | Check server logs |
 | `502` | WhatsApp rejected the channel lookup | Transient upstream failure — retry; if it persists, confirm the channel still exists |
 | `503` | Instance not connected | Reconnect with `/connect` |
 
@@ -1185,9 +1239,11 @@ Note there is no `to` field — the destination is the JID in the path.
 |-------|---------|
 | Multi-tenant isolation | Each account only accesses its own instances, webhooks, and logs |
 | Password hashing | scrypt via Node.js native crypto (no external dependencies) |
-| Timing-safe auth | Constant-time API key comparison (prevents timing attacks) |
+| API keys at rest | Stored as SHA-256 hashes; rotated with password confirmation, old key revoked at once |
+| Panel sessions | HttpOnly, SameSite=Strict cookie, 12 h, revocable; same-origin `Origin` required on cookie writes |
+| Timing-safe auth | Constant-time admin key comparison (prevents timing attacks) |
 | Helmet | HTTP security headers |
-| Rate limiting | 100 req/min global · 30 send/min per IP · 10 auth/min per IP |
+| Rate limiting | 100 req/min global · 30 send/min per IP · 10 auth/min per IP · 10 failed logins or rotations per 15 min per account |
 | Body limit | 5 MB max per request |
 | SSRF protection | Media URLs must be HTTP/HTTPS — `file://` and others are rejected |
 | Path traversal | Instance names validated to `[a-zA-Z0-9_-]` only |

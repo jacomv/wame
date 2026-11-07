@@ -20,6 +20,16 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_accounts_email ON accounts(email);
 `);
 
+// ── Revocable panel sessions (token hashes only) ──────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS panel_sessions (
+    token_hash TEXT PRIMARY KEY,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_panel_sessions_expiry ON panel_sessions(expires_at);
+`);
+
 // ── Instance ownership ──────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS instance_owners (

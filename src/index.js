@@ -10,6 +10,7 @@ import { requireApiKey } from './auth.js';
 import { getAllStatus, restoreExistingSessions, shutdown } from './manager.js';
 import { getOwnedInstances } from './accounts.js';
 import { checkUpdates } from './updater.js';
+import { trustProxySetting, jsonErrorHandler } from './utils/http.js';
 import authRoutes from './routes/auth.js';
 import instanceRoutes from './routes/instances.js';
 import newsletterRoutes from './routes/newsletters.js';
@@ -20,7 +21,7 @@ import versionRoutes from './routes/version.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', trustProxySetting(process.env.TRUST_PROXY));
 
 // ── Seguridad ───────────────────────────────────────────────────
 app.use(helmet({
@@ -80,6 +81,9 @@ app.use('/instances', newsletterRoutes);
 app.use('/instances', webhookRoutes);
 app.use('/logs', logRoutes);
 app.use('/version', versionRoutes);
+
+// Errores (JSON malformado, etc.) en JSON y sin stack trace
+app.use(jsonErrorHandler);
 
 // ── Arranque ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
