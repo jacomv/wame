@@ -26,6 +26,29 @@ const authLimiter = rateLimit({
   message: { error: 'Demasiados intentos. Intenta más tarde.' },
 });
 
+// Límite por cuenta: frena la fuerza bruta aunque el atacante cambie de IP
+// (o falsifique X-Forwarded-For). Solo cuentan los intentos fallidos.
+const ACCOUNT_WINDOW_MS = 15 * 60_000;
+const ACCOUNT_MAX_FAILURES = 10;
+const accountLimit = keyGenerator => rateLimit({
+  windowMs: ACCOUNT_WINDOW_MS,
+  max: ACCOUNT_MAX_FAILURES,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator,
+  skip: req => !keyGenerator(req),
+  message: { error: 'Demasiados intentos fallidos para esta cuenta. Intenta en 15 minutos.' },
+});
+const loginAccountLimiter = accountLimit(req => {
+  const email = req.body?.email;
+  return typeof email === 'string' && email.trim() ? `login:${email.trim().toLowerCase()}` : '';
+});
+const rotateAccountLimiter = accountLimit(req => {
+  const session = findSession(readSessionCookie(req));
+  return session ? `rotate:${session.id}` : '';
+});
+
 // ── Config pública (el panel la lee para mostrar o no la pestaña de registro)
 router.get('/config', (_req, res) => {
   res.json({ registration: registrationOpen() });
@@ -65,8 +88,8 @@ router.post('/register', authLimiter, (req, res) => {
 });
 
 // ── Login ───────────────────────────────────────────────────────
-router.post('/login', authLimiter, (req, res) => {
-  const { email, password } = req.body;
+router.post('/login', authLimiter, loginAccountLimiter, (req, res) => {
+  const { email, password } = req.body || {};
 
   if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
     return res.status(400).json({ error: 'Campos "email" y "password" requeridos' });
@@ -84,7 +107,7 @@ router.post('/login', authLimiter, (req, res) => {
 
 // Rotate the permanent integration credential only after password re-authentication.
 // Old key becomes invalid immediately; new key is revealed exactly once.
-router.post('/api-key/rotate', authLimiter, (req, res) => {
+router.post('/api-key/rotate', authLimiter, rotateAccountLimiter, (req, res) => {
   const session = findSession(readSessionCookie(req));
   if (!session) return res.status(401).json({ error: 'Sesión requerida' });
   const expectedOrigin = `${req.protocol}://${req.get('host')}`;
