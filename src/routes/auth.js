@@ -51,11 +51,10 @@ router.post('/register', authLimiter, (req, res) => {
 
   try {
     const result = registerAccount(email.trim().toLowerCase(), password);
-    res.status(201).json({
-      ok: true,
-      email: result.email,
-      apiKey: result.apiKey,
-    });
+    const account = loginAccount(email.trim().toLowerCase(), password);
+    const { token } = createSession(account.id);
+    res.setHeader('Set-Cookie', sessionCookie(token, req.secure));
+    res.status(201).json({ ok: true, email: result.email });
   } catch (err) {
     if (err.message === 'Email already registered') {
       return res.status(409).json({ error: 'Este email ya está registrado' });
@@ -89,6 +88,8 @@ router.get('/session', (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
+  const expectedOrigin = `${req.protocol}://${req.get('host')}`;
+  if (req.get('origin') !== expectedOrigin) return res.status(403).json({ error: 'Origen no permitido' });
   revokeSession(readSessionCookie(req));
   res.setHeader('Set-Cookie', clearSessionCookie(req.secure));
   res.json({ ok: true });
