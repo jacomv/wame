@@ -1,5 +1,16 @@
-import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'crypto';
 import db from './db.js';
+
+// Existing plaintext keys are migrated in-place to SHA-256 on startup.
+// Keys are high-entropy random secrets, so a fast keyed lookup hash is appropriate.
+const apiKeyHash = key => createHash('sha256').update(key).digest('hex');
+const legacyKeys = db.prepare('SELECT id, api_key FROM accounts').all();
+const migrateKey = db.prepare('UPDATE accounts SET api_key = ? WHERE id = ?');
+db.transaction(() => {
+  for (const row of legacyKeys) {
+    if (!/^[a-f0-9]{64}$/.test(row.api_key)) migrateKey.run(apiKeyHash(row.api_key), row.id);
+  }
+})();
 
 const stmtInsert = db.prepare(
   `INSERT INTO accounts (email, password_hash, api_key) VALUES (?, ?, ?)`
@@ -33,20 +44,29 @@ export function registerAccount(email, password) {
 
   const passwordHash = hashPassword(password);
   const apiKey = generateApiKey();
-  stmtInsert.run(email, passwordHash, apiKey);
+  const result = stmtInsert.run(email, passwordHash, apiKeyHash(apiKey));
 
-  return { email, apiKey };
+  return { id: Number(result.lastInsertRowid), email, apiKey };
 }
 
 export function loginAccount(email, password) {
   const account = stmtByEmail.get(email);
   if (!account) return null;
   if (!verifyPassword(password, account.password_hash)) return null;
-  return { id: account.id, email: account.email, apiKey: account.api_key };
+  return { id: account.id, email: account.email };
 }
 
 export function findByApiKey(apiKey) {
-  return stmtByApiKey.get(apiKey) ?? null;
+  if (typeof apiKey !== 'string' || !apiKey) return null;
+  return stmtByApiKey.get(apiKeyHash(apiKey)) ?? null;
+}
+
+const stmtRotateKey = db.prepare('UPDATE accounts SET api_key = ? WHERE id = ?');
+export function rotateApiKey(accountId) {
+  const apiKey = generateApiKey();
+  const result = stmtRotateKey.run(apiKeyHash(apiKey), accountId);
+  if (!result.changes) return null;
+  return apiKey; // Reveal only once; never store plaintext.
 }
 
 // ── Instance ownership ──────────────────────────────────────────
