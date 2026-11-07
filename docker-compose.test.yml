@@ -13,7 +13,6 @@ services:
       DATA_DIR: /data
       SESSION_DIR: /data/sessions
       WEBHOOKS_DIR: /data/webhooks
-      ALLOW_REGISTRATION: "false"
       CORS_ORIGIN: http://localhost:3100
     volumes:
       - wame_auth_test_data:/data
