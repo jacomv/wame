@@ -1,0 +1,24 @@
+# Isolated authentication test environment for PR #28.
+# Start: WAME_TEST_API_KEY="$(openssl rand -hex 32)" docker compose -f docker-compose.test.yml up --build -d
+# Only accessible from localhost. Never reuse production credentials or volumes.
+services:
+  wame-test:
+    build: .
+    restart: "no"
+    ports:
+      - "127.0.0.1:3100:3000"
+    environment:
+      API_KEY: ${WAME_TEST_API_KEY:?Set WAME_TEST_API_KEY to a random test-only secret}
+      PORT: "3000"
+      DATA_DIR: /data
+      SESSION_DIR: /data/sessions
+      WEBHOOKS_DIR: /data/webhooks
+      ALLOW_REGISTRATION: "false"
+      CORS_ORIGIN: http://localhost:3100
+    volumes:
+      - wame_auth_test_data:/data
+    stop_grace_period: 30s
+
+volumes:
+  wame_auth_test_data:
+    name: wame_pr28_auth_test_data
