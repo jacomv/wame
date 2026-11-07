@@ -7,7 +7,7 @@ const dir = mkdtempSync(join(tmpdir(), 'wame-auth-integration-'));
 process.env.DATA_DIR = dir;
 process.env.API_KEY = 'integration-admin-secret';
 const { default: db } = await import('../src/db.js');
-const { registerAccount } = await import('../src/accounts.js');
+const { registerAccount, rotateApiKey, findByApiKey } = await import('../src/accounts.js');
 const { createSession } = await import('../src/panel-sessions.js');
 const { requireApiKey } = await import('../src/auth.js');
 const { default: authRoutes } = await import('../src/routes/auth.js');
@@ -68,6 +68,16 @@ describe('panel cookie and API key isolation', () => {
     const { res, next } = authorize('GET', { cookie, 'x-api-key': 'bad-key' });
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('stores API key hashes and revokes previous keys on rotation', () => {
+    const stored = db.prepare('SELECT api_key FROM accounts WHERE id = ?').get(accountId).api_key;
+    expect(stored).not.toBe(apiKey);
+    expect(stored).toMatch(/^[a-f0-9]{64}$/);
+    const nextKey = rotateApiKey(accountId);
+    expect(nextKey).toMatch(/^wame_/);
+    expect(findByApiKey(apiKey)).toBeNull();
+    expect(findByApiKey(nextKey)?.id).toBe(accountId);
   });
 
   it('rejects absent credentials', () => {
